@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { motion, useReducedMotion } from "framer-motion"
 import { HeartHandshake, LockKeyhole, ServerCog, Sparkles } from "lucide-react"
 
-import { Button } from "@/shared/components/ui/button"
+import { AuthPanel } from "@/features/auth/components/AuthPanel"
 import { getReadiness } from "@/shared/lib/health"
 
 function FoundationPage() {
@@ -45,7 +45,7 @@ function FoundationPage() {
           >
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-300/10 px-3 py-1.5 text-sm text-violet-200">
               <Sparkles className="h-4 w-4" aria-hidden />
-              Fase 0 completada
+              Fase 1 · Cuentas seguras
             </div>
             <h1 className="font-display text-5xl font-semibold leading-[1.03] tracking-[-.04em] sm:text-7xl">
               Conexiones reales, con una base <span className="gradient-text">segura.</span>
@@ -53,11 +53,10 @@ function FoundationPage() {
             <p className="mt-7 max-w-xl text-lg leading-8 text-white/62">
               La nueva LLMatch empieza por lo que no se ve: arquitectura limpia, secretos fuera del código y servicios aislados antes de construir el primer perfil.
             </p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Button size="lg" disabled>
-                Próximamente: crear cuenta
-              </Button>
-              <span className="self-center text-sm text-white/45">Auth se implementará en la Fase 1</span>
+            <div className="mt-9 grid gap-4 sm:grid-cols-3">
+              <FoundationCard icon={LockKeyhole} title="Arranque seguro" text="Sin secretos predeterminados y con claves RSA verificadas." />
+              <FoundationCard icon={ServerCog} title="Servicios aislados" text="PostGIS y Redis viven únicamente en la red interna." />
+              <FoundationCard icon={HeartHandshake} title="Clean architecture" text="HTTP e infraestructura dependen de casos de uso, nunca al revés." />
             </div>
           </motion.div>
 
@@ -65,11 +64,8 @@ function FoundationPage() {
             initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.55, delay: prefersReducedMotion ? 0 : 0.12 }}
-            className="grid gap-4 sm:grid-cols-2"
           >
-            <FoundationCard icon={LockKeyhole} title="Arranque seguro" text="Sin secretos predeterminados y con claves RSA verificadas." />
-            <FoundationCard icon={ServerCog} title="Servicios aislados" text="PostGIS y Redis viven únicamente en la red interna." />
-            <FoundationCard icon={HeartHandshake} title="Clean architecture" text="HTTP e infraestructura dependen de casos de uso, nunca al revés." className="sm:col-span-2" />
+            <AuthPanel />
           </motion.div>
         </section>
       </div>
