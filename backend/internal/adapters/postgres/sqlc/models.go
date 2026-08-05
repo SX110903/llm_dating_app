@@ -3,3 +3,39 @@
 //   sqlc v1.31.1
 
 package db
+
+import (
+	"net/netip"
+
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type RefreshToken struct {
+	ID           pgtype.UUID        `json:"id"`
+	UserID       pgtype.UUID        `json:"user_id"`
+	FamilyID     pgtype.UUID        `json:"family_id"`
+	TokenHash    []byte             `json:"token_hash"`
+	ReplacedBy   pgtype.UUID        `json:"replaced_by"`
+	DeviceLabel  pgtype.Text        `json:"device_label"`
+	UserAgent    pgtype.Text        `json:"user_agent"`
+	Ip           *netip.Addr        `json:"ip"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	LastUsedAt   pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
+	RevokeReason pgtype.Text        `json:"revoke_reason"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type User struct {
+	ID                pgtype.UUID        `json:"id"`
+	Email             string             `json:"email"`
+	PasswordHash      string             `json:"password_hash"`
+	DisplayName       pgtype.Text        `json:"display_name"`
+	BirthDate         pgtype.Date        `json:"birth_date"`
+	Gender            pgtype.Text        `json:"gender"`
+	Status            string             `json:"status"`
+	EmailVerifiedAt   pgtype.Timestamptz `json:"email_verified_at"`
+	PasswordChangedAt pgtype.Timestamptz `json:"password_changed_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
