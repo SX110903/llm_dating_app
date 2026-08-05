@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { motion, useReducedMotion } from "framer-motion"
 import { HeartHandshake, LockKeyhole, ServerCog, Sparkles } from "lucide-react"
-import { Route, Routes } from "react-router-dom"
 
 import { Button } from "@/shared/components/ui/button"
 import { getReadiness } from "@/shared/lib/health"
@@ -91,10 +90,5 @@ function FoundationCard({ icon: Icon, title, text, className = "" }: { icon: typ
 }
 
 export function App() {
-  return (
-    <Routes>
-      <Route path="*" element={<FoundationPage />} />
-    </Routes>
-  )
+  return <FoundationPage />
 }
-

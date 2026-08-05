@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
-import { MemoryRouter } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { App } from "@/app/App"
@@ -24,9 +23,7 @@ describe("App", () => {
 
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <App />
-        </MemoryRouter>
+        <App />
       </QueryClientProvider>,
     )
 
@@ -35,4 +32,3 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /próximamente/i })).toBeDisabled()
   })
 })
-
