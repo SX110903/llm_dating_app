@@ -12,15 +12,15 @@ export function AuthPanel() {
 
   if (user) {
     return (
-      <div className="rounded-3xl border border-white/10 bg-white/[.045] p-6 shadow-2xl shadow-black/15 backdrop-blur-xl">
-        <p className="text-sm text-white/55">Sesión iniciada como</p>
+      <div className="rounded-[28px] border border-white/10 bg-white/[.04] p-8 text-center shadow-2xl shadow-black/20 backdrop-blur-2xl">
+        <p className="text-sm text-white/50">Sesión iniciada como</p>
         <p className="mt-1 text-lg font-semibold">{user.display_name}</p>
-        <p className="text-sm text-white/55">{user.email}</p>
+        <p className="text-sm text-white/50">{user.email}</p>
         <button
           type="button"
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
-          className="mt-5 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10 disabled:opacity-50"
+          className="mt-6 w-full rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-50"
         >
           {logout.isPending ? "Saliendo…" : "Cerrar sesión"}
         </button>
@@ -29,12 +29,12 @@ export function AuthPanel() {
   }
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[.045] p-6 shadow-2xl shadow-black/15 backdrop-blur-xl">
-      <div className="mb-5 flex gap-2 text-sm">
+    <div className="rounded-[28px] border border-white/10 bg-white/[.04] p-8 shadow-2xl shadow-black/20 backdrop-blur-2xl">
+      <div className="mb-7 flex rounded-full bg-white/5 p-1 text-sm">
         <button
           type="button"
           onClick={() => setMode("login")}
-          className={`rounded-full px-3 py-1.5 transition-colors ${
+          className={`flex-1 rounded-full py-2 font-medium transition-colors ${
             mode === "login" ? "bg-white text-zinc-950" : "text-white/60 hover:text-white"
           }`}
         >
@@ -43,7 +43,7 @@ export function AuthPanel() {
         <button
           type="button"
           onClick={() => setMode("register")}
-          className={`rounded-full px-3 py-1.5 transition-colors ${
+          className={`flex-1 rounded-full py-2 font-medium transition-colors ${
             mode === "register" ? "bg-white text-zinc-950" : "text-white/60 hover:text-white"
           }`}
         >
