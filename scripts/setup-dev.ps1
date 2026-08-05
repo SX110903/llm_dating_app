@@ -13,8 +13,14 @@ if ((Test-Path -LiteralPath $envPath) -and -not $Force) {
 
 function New-Secret {
     $bytes = New-Object byte[] 32
-    [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-    return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+    $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $random.GetBytes($bytes)
+        return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+    }
+    finally {
+        $random.Dispose()
+    }
 }
 
 $contents = @"
@@ -34,4 +40,3 @@ JWT_PUBLIC_KEY_PATH=./secrets/dev/jwt_public.pem
 
 [System.IO.File]::WriteAllText($envPath, $contents, [System.Text.UTF8Encoding]::new($false))
 Write-Host "Entorno de desarrollo creado en $envPath (ignorado por Git)."
-

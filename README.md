@@ -7,14 +7,14 @@ Reescritura segura de LLMatch como monorepo Go + React. La implementación avanz
 - Go 1.25.3+
 - Node.js 24.14.0+ y pnpm 11.9.0+
 - Docker Desktop con Docker Compose
-- PowerShell 7 en Windows, u OpenSSL en Linux/macOS, para generar claves locales
+- Windows PowerShell 5.1+ en Windows, u OpenSSL en Linux/macOS, para generar secretos locales
 
 ## Arranque seguro en desarrollo
 
 No hay contraseñas ni claves predeterminadas. El script crea secretos aleatorios locales ignorados por Git:
 
 ```powershell
-pwsh -NoProfile -File scripts/setup-dev.ps1
+powershell -NoProfile -File scripts/setup-dev.ps1
 docker compose up --build
 ```
 
@@ -35,6 +35,8 @@ go test -race ./...
 
 cd ../frontend
 pnpm install --frozen-lockfile
+pnpm audit --prod
+pnpm peers check
 pnpm lint
 pnpm test
 pnpm build
@@ -56,6 +58,7 @@ Healthchecks:
 - Postgres y Redis no publican puertos al host.
 - Los secretos se montan como Docker secrets y no participan en el build.
 - CI fija acciones y dependencias, ejecuta lint, tests con race detector, generación `sqlc`, Gitleaks y builds.
+- Las imágenes base también están fijadas por digest. La configuración de producción se superpone con `docker-compose.prod.yml` y exige endpoints TLS y certificados reales declarados en `.env.example`.
+- React Router queda fuera de la Fase 0 porque una única pantalla no necesita navegación y las ramas publicadas auditadas contenían avisos de seguridad; se reevaluará cuando una fase funcional lo requiera.
 
 La autenticación y el resto de funcionalidades no pertenecen a esta fase y no se anuncian como implementadas.
-

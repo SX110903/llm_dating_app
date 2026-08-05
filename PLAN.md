@@ -1,6 +1,6 @@
 # LLMatch v2 — plan de ejecución
 
-Estado: **pendiente de aprobación**. Este documento es el entregable previo a la programación que exige `02_PROMPT_CLAUDE_CODE.md`. Hasta que se apruebe no se generará código ni se iniciará la Fase 0.
+Estado: **aprobado el 5 de agosto de 2026**. La Fase 0 está implementada y validada; no se iniciará la Fase 1 sin la revisión y confirmación previstas entre fases.
 
 ## 1. Alcance y decisiones cerradas
 
