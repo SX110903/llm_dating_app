@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: LLMatch API
-  version: 0.1.0
-  description: Contrato de la Fase 0. Solo expone comprobaciones de salud.
+  version: 0.2.0
+  description: Contrato hasta la Fase 1. Expone comprobaciones de salud y autenticación.
 servers:
   - url: /api/v1
 paths:
@@ -32,7 +32,181 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /auth/register:
+    post:
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Cuenta creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          description: El email ya está registrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Contraseña débil o edad mínima no alcanzada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Demasiados intentos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/login:
+    post:
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Sesión iniciada. El refresh token viaja en una cookie HttpOnly.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Credenciales inválidas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Demasiados intentos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/refresh:
+    post:
+      operationId: refreshSession
+      description: Requiere la cookie refresh_token; valida el origen contra la allowlist.
+      responses:
+        "200":
+          description: Nuevo par de tokens emitido; el refresh token rota.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Refresh token ausente, inválido, caducado o reutilizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Origen no permitido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/logout:
+    post:
+      operationId: logout
+      security:
+        - bearerAuth: []
+      description: Revoca el jti del access token actual y la familia del refresh token de la cookie, si está presente.
+      responses:
+        "204":
+          description: Sesión cerrada.
+        "401":
+          description: Access token ausente, inválido o ya revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/logout-all:
+    post:
+      operationId: logoutAll
+      security:
+        - bearerAuth: []
+      description: Revoca todas las familias de refresh token y todos los jti activos del usuario.
+      responses:
+        "204":
+          description: Todas las sesiones cerradas.
+        "401":
+          description: Access token ausente, inválido o ya revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Access token ausente, inválido o ya revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthResponse:
       type: object
@@ -46,4 +220,84 @@ components:
           additionalProperties:
             type: string
             enum: [up, down]
-
+    RegisterRequest:
+      type: object
+      required: [email, password, display_name, birth_date, gender]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+        display_name:
+          type: string
+          maxLength: 100
+        birth_date:
+          type: string
+          format: date
+        gender:
+          type: string
+          maxLength: 50
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    User:
+      type: object
+      required: [id, email, display_name, birth_date, gender, status, email_verified_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        birth_date:
+          type: string
+          format: date
+        gender:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, deleted]
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    LoginResponse:
+      type: object
+      required: [access_token, access_token_expires_at, user]
+      properties:
+        access_token:
+          type: string
+        access_token_expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/User"
+    ErrorResponse:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: string

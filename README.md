@@ -1,6 +1,6 @@
 # LLMatch v2
 
-Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente solo está implementada la **Fase 0 — Fundación**.
+Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente están implementadas la **Fase 0 — Fundación** y la **Fase 1 — Auth**.
 
 ## Requisitos
 
@@ -28,6 +28,8 @@ docker compose up --build
 La aplicación queda disponible en `http://localhost:8080`. Solo el reverse proxy publica un puerto; API, frontend, PostGIS y Redis permanecen en redes internas.
 
 ## Verificación local
+
+`backend/test/integration` usa contenedores reales (Postgres, Redis) vía testcontainers-go, así que Docker debe estar disponible al ejecutar los tests del backend.
 
 ```powershell
 cd backend
@@ -59,6 +61,13 @@ Healthchecks:
 - Los secretos se montan como Docker secrets y no participan en el build.
 - CI fija acciones y dependencias, ejecuta lint, tests con race detector, generación `sqlc`, Gitleaks y builds.
 - Las imágenes base también están fijadas por digest. La configuración de producción se superpone con `docker-compose.prod.yml` y exige endpoints TLS y certificados reales declarados en `.env.example`.
-- React Router queda fuera de la Fase 0 porque una única pantalla no necesita navegación y las ramas publicadas auditadas contenían avisos de seguridad; se reevaluará cuando una fase funcional lo requiera.
+- React Router sigue fuera del árbol: login, registro y la vista autenticada caben en una sola pantalla con estado local, así que se mantiene la decisión de Fase 0 hasta que una fase funcional necesite navegación real.
 
-La autenticación y el resto de funcionalidades no pertenecen a esta fase y no se anuncian como implementadas.
+## Autenticación (Fase 1)
+
+- Endpoints `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/logout-all` y `GET /auth/me` bajo `/api/v1`. Contrato completo en [api/openapi.yaml](api/openapi.yaml).
+- Contraseñas con Argon2id (rehash transparente tras login) y JWT de acceso RS256 de 15 minutos con `sub`, `jti`, `iat`, `exp`, `iss` y `aud`.
+- Refresh token opaco de 256 bits en cookie `HttpOnly`, `Secure` en producción, `SameSite=Strict` y `Path=/api/v1/auth`; rota en cada uso y revoca toda su familia si se detecta reutilización.
+- El middleware de rutas autenticadas es fail-closed: si Redis no responde al comprobar el `jti`, la respuesta es `503 AUTH_DEPENDENCY_UNAVAILABLE` y el handler protegido nunca se ejecuta.
+- Rate limiting distribuido en Redis por IP y por email normalizado, con backoff progresivo ante intentos repetidos en register y login.
+- El resto de funcionalidades (perfiles, discovery, mensajería, verificación de email, recuperación de contraseña) no pertenecen a esta fase y no se anuncian como implementadas.
