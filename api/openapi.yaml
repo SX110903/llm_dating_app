@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: LLMatch API
+  version: 0.1.0
+  description: Contrato de la Fase 0. Solo expone comprobaciones de salud.
+servers:
+  - url: /api/v1
+paths:
+  /health/live:
+    get:
+      operationId: getLiveness
+      responses:
+        "200":
+          description: El proceso está vivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /health/ready:
+    get:
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Todas las dependencias están disponibles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Alguna dependencia no está disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [up, down]
+

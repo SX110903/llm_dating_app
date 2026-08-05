@@ -1,0 +1,11 @@
+.git
+.github
+.env*
+secrets
+work
+**/node_modules
+**/dist
+**/coverage
+**/*.log
+PLAN.md
+

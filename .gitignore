@@ -1,0 +1,29 @@
+# Environment and secrets
+.env*
+!.env.example
+secrets/**
+!secrets/.gitkeep
+
+# Go
+backend/bin/
+backend/coverage.out
+backend/coverage.html
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local runtime data
+work/
+uploads/
+*.log
+
