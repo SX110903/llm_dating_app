@@ -29,6 +29,6 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: /conexiones reales/i })).toBeInTheDocument()
     expect(await screen.findByText("Fundación operativa")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /próximamente/i })).toBeDisabled()
+    expect(screen.getByRole("button", { name: /iniciar sesión/i })).toBeInTheDocument()
   })
 })
