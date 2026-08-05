@@ -8,7 +8,8 @@ psql --set=ON_ERROR_STOP=1 \
   --username "$POSTGRES_USER" \
   --dbname "$POSTGRES_DB" \
   --set=app_password="$APP_DB_PASSWORD" \
-  --set=migrator_password="$MIGRATOR_DB_PASSWORD" <<'SQL'
+  --set=migrator_password="$MIGRATOR_DB_PASSWORD" \
+  --set=POSTGRES_DB="$POSTGRES_DB" <<'SQL'
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA public;
