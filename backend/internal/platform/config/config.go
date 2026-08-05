@@ -33,6 +33,11 @@ type Config struct {
 	RedisURL         string
 	JWTPrivateKey    string
 	JWTPublicKey     string
+	JWTIssuer        string
+	JWTAudience      string
+	AccessTokenTTL   time.Duration
+	RefreshTokenTTL  time.Duration
+	AuthCheckTimeout time.Duration
 	AllowedOrigins   []string
 	ReadinessTimeout time.Duration
 	ShutdownTimeout  time.Duration
@@ -88,6 +93,18 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	accessTokenTTL, err := durationEnv("ACCESS_TOKEN_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	refreshTokenTTL, err := durationEnv("REFRESH_TOKEN_TTL", 30*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	authCheckTimeout, err := durationEnv("AUTH_CHECK_TIMEOUT", 300*time.Millisecond)
+	if err != nil {
+		return Config{}, err
+	}
 
 	config := Config{
 		Environment:      Environment(raw.Environment),
@@ -99,6 +116,11 @@ func Load() (Config, error) {
 		RedisURL:         raw.RedisURL,
 		JWTPrivateKey:    raw.JWTPrivateKey,
 		JWTPublicKey:     raw.JWTPublicKey,
+		JWTIssuer:        getEnv("JWT_ISSUER", "llmatch-v2"),
+		JWTAudience:      getEnv("JWT_AUDIENCE", "llmatch-v2-clients"),
+		AccessTokenTTL:   accessTokenTTL,
+		RefreshTokenTTL:  refreshTokenTTL,
+		AuthCheckTimeout: authCheckTimeout,
 		AllowedOrigins:   splitAndTrim(raw.AllowedOrigins),
 		ReadinessTimeout: readinessTimeout,
 		ShutdownTimeout:  shutdownTimeout,

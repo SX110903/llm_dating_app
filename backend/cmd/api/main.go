@@ -11,12 +11,17 @@ import (
 	"time"
 
 	httpadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/http"
+	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
+	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
 	redisadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/redis"
+	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
 	"github.com/sx110903/llmatch-v2/backend/internal/platform/config"
+	platformcrypto "github.com/sx110903/llmatch-v2/backend/internal/platform/crypto"
 	platformlogger "github.com/sx110903/llmatch-v2/backend/internal/platform/logger"
+	platformmiddleware "github.com/sx110903/llmatch-v2/backend/internal/platform/middleware"
 )
 
 func main() {
@@ -50,6 +55,32 @@ func run() error {
 	}
 	defer func() { _ = redisClient.Close() }()
 
+	privateKey, err := platformcrypto.LoadRSAPrivateKey(cfg.JWTPrivateKey)
+	if err != nil {
+		return err
+	}
+	publicKey, err := platformcrypto.LoadRSAPublicKey(cfg.JWTPublicKey)
+	if err != nil {
+		return err
+	}
+	tokenIssuer := platformcrypto.NewTokenIssuer(privateKey, publicKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AccessTokenTTL)
+	denylist := redisadapter.NewTokenDenylist(redisClient)
+
+	authService := applicationauth.NewService(
+		repositories.NewUserRepository(postgresPool),
+		repositories.NewSessionRepository(postgresPool),
+		platformcrypto.Argon2idHasher{},
+		tokenIssuer,
+		platformcrypto.OpaqueTokenGenerator{},
+		denylist,
+		redisadapter.NewRateLimiter(redisClient),
+		applicationauth.Config{RefreshTokenTTL: cfg.RefreshTokenTTL},
+	)
+
+	const authCookiePath = "/api/v1/auth"
+	authHandler := httpauth.NewHandler(authService, cfg.IsProduction(), authCookiePath, cfg.AllowedOrigins)
+	authMiddleware := platformmiddleware.Auth(tokenIssuer, denylist, cfg.AuthCheckTimeout)
+
 	healthService := applicationhealth.NewService(cfg.ReadinessTimeout,
 		postgres.Checker{Pool: postgresPool},
 		redisadapter.Checker{Client: redisClient},
@@ -59,6 +90,8 @@ func run() error {
 		AllowedOrigins: cfg.AllowedOrigins,
 		Production:     cfg.IsProduction(),
 		Health:         httphealth.NewHandler(healthService),
+		Auth:           authHandler,
+		AuthMiddleware: authMiddleware,
 	})
 
 	server := &http.Server{
