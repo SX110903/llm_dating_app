@@ -1,6 +1,6 @@
 # LLMatch v2 — plan de ejecución
 
-Estado: **aprobado el 5 de agosto de 2026**. Las Fases 0, 1 y 2 están implementadas y validadas; no se iniciará la Fase 3 sin la revisión y confirmación previstas entre fases.
+Estado: **aprobado el 5 de agosto de 2026**. Las Fases 0, 1, 2 y 3 están implementadas y validadas. La ejecución queda detenida antes de la Fase 4 hasta recibir una nueva confirmación.
 
 ## 1. Alcance y decisiones cerradas
 
@@ -276,12 +276,14 @@ La aplicación usará un rol de base de datos con privilegios mínimos y sin DDL
 
 ### Fase 3 — Discover, swipe y matches
 
+- **Estado: completada y validada el 6 de agosto de 2026.** No inicia trabajo de la Fase 4.
 - Filtros duros: estado activo, onboarding completo, edad, compatibilidad de género mutua, distancia PostGIS, no visto, no bloqueado y no emparejado.
-- Ranking inicial determinista y auditable: intereses compartidos, afinidad del cuestionario, distancia y actividad reciente. No se presentará como “IA”. Pesos configurables y tests con fixtures conocidos.
-- Swipe idempotente; like/superlike mutuo crea match de forma transaccional. Límite diario aplicado con Redis y confirmado por persistencia.
-- APIs de discovery con cursor, swipe, listado de matches, unmatch, block y report.
-- Frontend con cartas drag/spring y modal de match; invalidaciones TanStack Query tras cada acción.
-- Tests de likes concurrentes, filtros PostGIS, bloqueos, límites y autorización de unmatch.
+- Ranking determinista y auditable implementado con pesos configurables: intereses compartidos `0.35`, afinidad del cuestionario `0.30`, distancia `0.20` y actividad reciente `0.15`. Los empates se resuelven de forma estable y el cursor opaco conserva la instantánea temporal del ranking.
+- Swipe idempotente; like/superlike mutuo crea un único match en la misma transacción, con el par de UUID ordenado y bloqueo transaccional para carreras concurrentes.
+- Límite predeterminado de 100 swipes por día UTC. Redis reserva capacidad mediante una operación atómica y PostgreSQL reconcilia el contador persistido; si Redis no está disponible, el swipe falla con 503 sin saltarse el límite. Al agotarse, la API responde 429 con `Retry-After` hasta el siguiente día UTC.
+- APIs implementadas: discovery y matches paginados por cursor, swipe, unmatch, block, report y lectura autenticada de fotos visibles. Un bloqueo oculta a ambas personas en discovery, invalida el acceso a sus fotos desde matching y deshace cualquier match activo entre ellas.
+- Frontend implementado con cartas drag/spring, modal de match persistente durante la invalidación, listado de matches y acciones de deshacer, bloquear y reportar. Las fotos se descargan con Bearer token y sus URLs de objeto se liberan sin romper el remount de React `StrictMode`.
+- Validación completada con unitarios de aplicación, integración contra Postgres/PostGIS y Redis reales, carreras de likes, ranking con fixtures, cursores, exclusión por distancia, fotos protegidas, bloqueos bidireccionales, límite diario, autorización e idempotencia de unmatch y sanitización de reportes. La interfaz se verificó también en escritorio y viewport móvil.
 
 ### Fase 4 — Mensajería en tiempo real
 

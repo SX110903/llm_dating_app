@@ -1,6 +1,6 @@
 # LLMatch v2
 
-Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente están implementadas la **Fase 0 — Fundación**, la **Fase 1 — Auth** y la **Fase 2 — Perfil y fotos**.
+Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente están implementadas y validadas las **Fases 0 a 3**. El trabajo está detenido antes de la Fase 4.
 
 ## Requisitos
 
@@ -77,4 +77,16 @@ Healthchecks:
 - `user_preferences.genders` es una categoría especial (RGPD art. 9): nunca se guarda sin un consentimiento activo y separado en `privacy_consents`; retirarlo borra el valor en la misma transacción que revoca el consentimiento.
 - Fotos: máximo 6, JPEG/PNG/WebP hasta 10 MiB, MIME y dimensiones detectados decodificando el contenido real (nunca la extensión ni el nombre original), clave de almacenamiento basada en UUID. Storage local en desarrollo, S3 (AWS SDK v2) en producción, con compensación automática si falla la base de datos tras subir el blob.
 - Borrado de foto: lógico y síncrono; la limpieza del blob es asíncrona y best-effort. Si se borra la foto principal, se promueve automáticamente otra restante.
-- El resto de funcionalidades (discovery, mensajería, verificación de email, recuperación de contraseña) no pertenecen a esta fase y no se anuncian como implementadas.
+
+## Discovery, swipes y matches (Fase 3)
+
+- Endpoints autenticados `GET /discovery`, `POST /swipes`, `GET/DELETE /matches[/{matchID}]`, `POST /blocks`, `POST /reports` y `GET /matching/photos/{photoID}/content`. El contrato completo, incluidos cursores, errores y `Retry-After`, está en [api/openapi.yaml](api/openapi.yaml).
+- Discovery aplica compatibilidad mutua de género y edad, distancia PostGIS, onboarding/consentimiento/foto, estado activo y exclusiones por swipe, match o bloqueo. El ranking determinista usa intereses `0.35`, cuestionario `0.30`, distancia `0.20` y actividad `0.15`; los pesos se pueden configurar por entorno.
+- El like o superlike mutuo crea un único match dentro de la transacción del segundo swipe. Los pares se ordenan por UUID y las carreras concurrentes están cubiertas por pruebas de integración.
+- El límite predeterminado es de 100 swipes por día UTC. Redis mantiene la reserva atómica reconciliada con PostgreSQL; una caída de Redis devuelve 503 y nunca desactiva el límite. Al agotarlo, la respuesta es 429 con los segundos restantes en `Retry-After`.
+- Bloquear es idempotente, deshace el match activo y oculta perfiles y fotos en ambas direcciones. Los reportes admiten motivos cerrados y una descripción sanitizada de hasta 1000 caracteres.
+- La interfaz incluye cartas con drag/spring, modal de match, listado y acciones de seguridad. Las fotos de discovery y matches se obtienen con el access token; no se exponen como objetos públicos.
+
+Variables opcionales con valores predeterminados seguros para esta fase: `MATCHING_DAILY_SWIPE_LIMIT=100`, `MATCHING_WEIGHT_INTERESTS=0.35`, `MATCHING_WEIGHT_QUESTIONNAIRE=0.30`, `MATCHING_WEIGHT_DISTANCE=0.20` y `MATCHING_WEIGHT_ACTIVITY=0.15`.
+
+Mensajería, historias, verificación de email y recuperación de contraseña todavía no están implementadas. La siguiente fase no se inicia sin confirmación.

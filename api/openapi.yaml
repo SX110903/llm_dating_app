@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: LLMatch API
-  version: 0.3.0
-  description: Contrato hasta la Fase 2. Expone comprobaciones de salud, autenticación y gestión de perfil.
+  version: 0.4.0
+  description: Contrato hasta la Fase 3. Expone salud, autenticación, perfil, discovery, swipes, matches y acciones de seguridad.
 servers:
   - url: /api/v1
 paths:
@@ -499,6 +499,349 @@ paths:
       responses:
         "204":
           description: Consentimiento retirado.
+  /discovery:
+    get:
+      operationId: discoverCandidates
+      security:
+        - bearerAuth: []
+      description: Devuelve candidatos elegibles con ranking determinista y cursor opaco estable.
+      parameters:
+        - name: cursor
+          in: query
+          description: Cursor opaco devuelto por la página anterior.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Tamaño de página; 20 por defecto y 50 como máximo.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Página de candidatos ordenada por afinidad.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryPage"
+        "400":
+          description: Cursor o límite inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Perfil, preferencias, consentimiento, ubicación o foto principal incompletos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Redis, Postgres o almacenamiento no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /swipes:
+    post:
+      operationId: createSwipe
+      security:
+        - bearerAuth: []
+      description: Registra un swipe idempotente. Un like o superlike mutuo puede crear un match.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwipeRequest"
+      responses:
+        "200":
+          description: Swipe ya existente; se devuelve su resultado original.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwipeResult"
+        "201":
+          description: Swipe creado; `match` está presente cuando existe reciprocidad positiva.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwipeResult"
+        "400":
+          description: JSON, UUID o campos inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Candidato inexistente, bloqueado o no visible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Acción inválida o intento de interacción con uno mismo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Límite diario de swipes agotado.
+          headers:
+            Retry-After:
+              description: Segundos hasta el inicio del siguiente día UTC.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No se puede comprobar autenticación o reservar el límite diario de forma segura.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /matches:
+    get:
+      operationId: listMatches
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          description: Cursor opaco devuelto por la página anterior.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Tamaño de página; 20 por defecto y 50 como máximo.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Matches activos del usuario, del más reciente al más antiguo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchPage"
+        "400":
+          description: Cursor o límite inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o matching no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /matches/{matchID}:
+    delete:
+      operationId: unmatch
+      security:
+        - bearerAuth: []
+      description: Deshace un match activo. Repetir la operación por un participante es idempotente.
+      parameters:
+        - name: matchID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Match deshecho o ya deshecho por el mismo participante.
+        "400":
+          description: UUID inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Match inexistente o ajeno al usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o matching no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /blocks:
+    post:
+      operationId: blockUser
+      security:
+        - bearerAuth: []
+      description: Bloquea en ambas direcciones de visibilidad y deshace cualquier match activo entre las personas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockRequest"
+      responses:
+        "204":
+          description: Bloqueo aplicado o ya existente.
+        "400":
+          description: JSON o UUID inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuario objetivo inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Intento de bloqueo a uno mismo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o matching no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /reports:
+    post:
+      operationId: reportUser
+      security:
+        - bearerAuth: []
+      description: Crea un reporte pendiente; la descripción se almacena como texto sanitizado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "201":
+          description: Reporte creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "400":
+          description: JSON, UUID o campos inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuario reportado inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Motivo, longitud o interacción inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o matching no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /matching/photos/{photoID}/content:
+    get:
+      operationId: getMatchingPhotoContent
+      security:
+        - bearerAuth: []
+      description: Devuelve una foto solo mientras su propietario sea visible para el usuario autenticado.
+      parameters:
+        - name: photoID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: "Contenido binario de la foto; la respuesta usa `Cache-Control: private, no-store`."
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            image/jpeg: {}
+            image/png: {}
+            image/webp: {}
+        "400":
+          description: UUID inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Foto inexistente, bloqueada o no visible para el usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación, matching o almacenamiento no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     bearerAuth:
@@ -568,9 +911,8 @@ components:
           type: string
           enum: [active, suspended, deleted]
         email_verified_at:
-          type: string
+          type: [string, "null"]
           format: date-time
-          nullable: true
         created_at:
           type: string
           format: date-time
@@ -733,5 +1075,187 @@ components:
         policy_version:
           type: string
         granted_at:
+          type: string
+          format: date-time
+    ScoreBreakdown:
+      type: object
+      required: [interests, questionnaire, distance, activity, total]
+      properties:
+        interests:
+          type: number
+          minimum: 0
+        questionnaire:
+          type: number
+          minimum: 0
+        distance:
+          type: number
+          minimum: 0
+        activity:
+          type: number
+          minimum: 0
+        total:
+          type: number
+          minimum: 0
+    Candidate:
+      type: object
+      required: [user_id, display_name, age, gender, bio, interests, city, distance_km, last_active_at, photo_url, score]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        age:
+          type: integer
+          minimum: 18
+        gender:
+          type: string
+        bio:
+          type: string
+        interests:
+          type: array
+          items:
+            type: string
+        city:
+          type: string
+        distance_km:
+          type: number
+          minimum: 0
+        last_active_at:
+          type: string
+          format: date-time
+        photo_url:
+          type: string
+          description: Ruta autenticada dentro de `/api/v1`; no es una URL pública.
+        score:
+          $ref: "#/components/schemas/ScoreBreakdown"
+    DiscoveryPage:
+      type: object
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Candidate"
+        next_cursor:
+          type: string
+          description: Ausente cuando no hay otra página.
+    SwipeRequest:
+      type: object
+      additionalProperties: false
+      required: [target_id, action]
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [like, dislike, superlike]
+    CreatedMatch:
+      type: object
+      required: [id, matched_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        matched_at:
+          type: string
+          format: date-time
+    SwipeResult:
+      type: object
+      required: [id, target_id, action, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        target_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [like, dislike, superlike]
+        created_at:
+          type: string
+          format: date-time
+        match:
+          $ref: "#/components/schemas/CreatedMatch"
+    Match:
+      type: object
+      required: [id, other_user_id, display_name, bio, city, photo_url, matched_at, last_active_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        other_user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        bio:
+          type: string
+        city:
+          type: string
+        photo_url:
+          type: string
+          description: Ruta autenticada dentro de `/api/v1`; no es una URL pública.
+        matched_at:
+          type: string
+          format: date-time
+        last_active_at:
+          type: string
+          format: date-time
+    MatchPage:
+      type: object
+      required: [matches]
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
+        next_cursor:
+          type: string
+          description: Ausente cuando no hay otra página.
+    BlockRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+    ReportRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, reason]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [harassment, spam, inappropriate_content, impersonation, underage, other]
+        description:
+          type: string
+          maxLength: 1000
+    Report:
+      type: object
+      required: [id, reported_id, reason, description, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reported_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          enum: [harassment, spam, inappropriate_content, impersonation, underage, other]
+        description:
+          type: string
+          maxLength: 1000
+        status:
+          type: string
+          enum: [pending, reviewing, resolved, dismissed]
+        created_at:
           type: string
           format: date-time
