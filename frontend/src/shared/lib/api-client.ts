@@ -56,6 +56,20 @@ async function performRefresh(): Promise<boolean> {
 }
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+	const response = await fetchWithRefresh(path, options)
+
+	if (response.status === 204) {
+		return undefined as T
+	}
+	return (await response.json()) as T
+}
+
+export async function apiFetchBlob(path: string): Promise<Blob> {
+	const response = await fetchWithRefresh(path, { headers: { Accept: "image/*" } })
+	return response.blob()
+}
+
+async function fetchWithRefresh(path: string, options: ApiFetchOptions): Promise<Response> {
   const { auth = true, body, headers, ...rest } = options
 
   const performFetch = () => {
@@ -95,8 +109,5 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     )
   }
 
-  if (response.status === 204) {
-    return undefined as T
-  }
-  return (await response.json()) as T
+	return response
 }

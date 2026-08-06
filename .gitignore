@@ -14,6 +14,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/coverage/
 frontend/.vite/
+frontend/.pnpm-store/
 
 # Editors and operating systems
 .idea/
