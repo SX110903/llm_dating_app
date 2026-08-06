@@ -60,6 +60,7 @@ Healthchecks:
 - Postgres y Redis no publican puertos al host.
 - Los secretos se montan como Docker secrets y no participan en el build.
 - CI fija acciones y dependencias, ejecuta lint, tests con race detector, generación `sqlc`, Gitleaks y builds.
+- **La ejecución automática del CI está pausada temporalmente** por indisponibilidad de runners: el workflow conserva todas sus comprobaciones pero solo arranca a demanda (`workflow_dispatch`). Mientras dure la pausa, las validaciones de la sección [Verificación local](#verificación-local) deben ejecutarse en local antes de cada push. Para reanudarlo basta con devolver los disparadores `push` y `pull_request` a `.github/workflows/ci.yml`.
 - Las imágenes base también están fijadas por digest. La configuración de producción se superpone con `docker-compose.prod.yml` y exige endpoints TLS y certificados reales declarados en `.env.example`.
 - React Router sigue fuera del árbol: login, registro y la vista autenticada caben en una sola pantalla con estado local, así que se mantiene la decisión de Fase 0 hasta que una fase funcional necesite navegación real.
 

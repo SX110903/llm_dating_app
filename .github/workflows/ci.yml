@@ -1,8 +1,10 @@
 name: CI
 
+# Automatic runs are paused while hosted runners are unavailable: the push and
+# pull_request triggers are temporarily removed so the workflow only starts on
+# demand. Every job below is unchanged; restore the two triggers to resume.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
