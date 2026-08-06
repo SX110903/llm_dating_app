@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 
-import { authInputClass, FormField } from "@/features/auth/components/FormField"
+import { FormField } from "@/features/auth/components/FormField"
+import { textInputClass } from "@/shared/components/ui/styles"
 import { useLogin } from "@/features/auth/hooks/use-auth"
 import { loginSchema, type LoginFormValues } from "@/features/auth/schemas/auth-schemas"
 import { Button } from "@/shared/components/ui/button"
@@ -22,14 +23,14 @@ export function LoginForm() {
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
       <FormField label="Email" htmlFor="login-email" error={errors.email?.message}>
-        <input id="login-email" type="email" autoComplete="email" className={authInputClass} {...register("email")} />
+        <input id="login-email" type="email" autoComplete="email" className={textInputClass} {...register("email")} />
       </FormField>
       <FormField label="Contraseña" htmlFor="login-password" error={errors.password?.message}>
         <input
           id="login-password"
           type="password"
           autoComplete="current-password"
-          className={authInputClass}
+          className={textInputClass}
           {...register("password")}
         />
       </FormField>

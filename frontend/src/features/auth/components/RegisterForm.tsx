@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 
-import { authInputClass, FormField } from "@/features/auth/components/FormField"
+import { FormField } from "@/features/auth/components/FormField"
+import { textInputClass } from "@/shared/components/ui/styles"
 import { useRegister } from "@/features/auth/hooks/use-auth"
 import { registerSchema, type RegisterFormValues } from "@/features/auth/schemas/auth-schemas"
 import { Button } from "@/shared/components/ui/button"
@@ -40,22 +41,22 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
       <FormField label="Email" htmlFor="register-email" error={errors.email?.message}>
-        <input id="register-email" type="email" autoComplete="email" className={authInputClass} {...register("email")} />
+        <input id="register-email" type="email" autoComplete="email" className={textInputClass} {...register("email")} />
       </FormField>
       <FormField label="Nombre visible" htmlFor="register-display-name" error={errors.displayName?.message}>
         <input
           id="register-display-name"
           type="text"
           autoComplete="nickname"
-          className={authInputClass}
+          className={textInputClass}
           {...register("displayName")}
         />
       </FormField>
       <FormField label="Fecha de nacimiento" htmlFor="register-birth-date" error={errors.birthDate?.message}>
-        <input id="register-birth-date" type="date" className={authInputClass} {...register("birthDate")} />
+        <input id="register-birth-date" type="date" className={textInputClass} {...register("birthDate")} />
       </FormField>
       <FormField label="Género" htmlFor="register-gender" error={errors.gender?.message}>
-        <select id="register-gender" defaultValue="" className={authInputClass} {...register("gender")}>
+        <select id="register-gender" defaultValue="" className={textInputClass} {...register("gender")}>
           <option value="" disabled>
             Selecciona una opción
           </option>
@@ -71,7 +72,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
           id="register-password"
           type="password"
           autoComplete="new-password"
-          className={authInputClass}
+          className={textInputClass}
           {...register("password")}
         />
       </FormField>
