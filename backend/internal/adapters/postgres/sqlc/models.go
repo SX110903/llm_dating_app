@@ -10,6 +10,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Block struct {
+	BlockerID pgtype.UUID        `json:"blocker_id"`
+	BlockedID pgtype.UUID        `json:"blocked_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Match struct {
+	ID          pgtype.UUID        `json:"id"`
+	UserLowID   pgtype.UUID        `json:"user_low_id"`
+	UserHighID  pgtype.UUID        `json:"user_high_id"`
+	MatchedAt   pgtype.Timestamptz `json:"matched_at"`
+	UnmatchedAt pgtype.Timestamptz `json:"unmatched_at"`
+	UnmatchedBy pgtype.UUID        `json:"unmatched_by"`
+}
+
 type Photo struct {
 	ID         pgtype.UUID        `json:"id"`
 	UserID     pgtype.UUID        `json:"user_id"`
@@ -63,6 +78,25 @@ type RefreshToken struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
+type Report struct {
+	ID          pgtype.UUID        `json:"id"`
+	ReporterID  pgtype.UUID        `json:"reporter_id"`
+	ReportedID  pgtype.UUID        `json:"reported_id"`
+	Reason      string             `json:"reason"`
+	Description string             `json:"description"`
+	Status      string             `json:"status"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	ResolvedAt  pgtype.Timestamptz `json:"resolved_at"`
+}
+
+type Swipe struct {
+	ID        pgtype.UUID        `json:"id"`
+	ActorID   pgtype.UUID        `json:"actor_id"`
+	TargetID  pgtype.UUID        `json:"target_id"`
+	Action    string             `json:"action"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type User struct {
 	ID                pgtype.UUID        `json:"id"`
 	Email             string             `json:"email"`
@@ -75,6 +109,7 @@ type User struct {
 	PasswordChangedAt pgtype.Timestamptz `json:"password_changed_at"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	LastActiveAt      pgtype.Timestamptz `json:"last_active_at"`
 }
 
 type UserPreference struct {

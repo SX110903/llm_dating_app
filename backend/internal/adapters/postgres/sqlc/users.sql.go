@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, email, password_hash, display_name, birth_date, gender, password_changed_at)
 VALUES ($1, $2, $3, $4, $5, $6, now())
-RETURNING id, email, password_hash, display_name, birth_date, gender, status, email_verified_at, password_changed_at, created_at, updated_at
+RETURNING id, email, password_hash, display_name, birth_date, gender, status, email_verified_at, password_changed_at, created_at, updated_at, last_active_at
 `
 
 type CreateUserParams struct {
@@ -48,12 +48,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastActiveAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, display_name, birth_date, gender, status, email_verified_at, password_changed_at, created_at, updated_at FROM users WHERE email = $1
+SELECT id, email, password_hash, display_name, birth_date, gender, status, email_verified_at, password_changed_at, created_at, updated_at, last_active_at FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -71,12 +72,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastActiveAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, display_name, birth_date, gender, status, email_verified_at, password_changed_at, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, password_hash, display_name, birth_date, gender, status, email_verified_at, password_changed_at, created_at, updated_at, last_active_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -94,6 +96,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastActiveAt,
 	)
 	return i, err
 }

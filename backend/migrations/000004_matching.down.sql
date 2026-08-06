@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS reports;
+DROP TABLE IF EXISTS blocks;
+DROP TABLE IF EXISTS matches;
+DROP TABLE IF EXISTS swipes;
+
+DROP INDEX IF EXISTS users_last_active_idx;
+ALTER TABLE users DROP COLUMN IF EXISTS last_active_at;
