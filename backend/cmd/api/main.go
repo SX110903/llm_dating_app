@@ -11,13 +11,18 @@ import (
 	"time"
 
 	httpadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/http"
+	httpaccount "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/account"
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
+	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
 	redisadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/redis"
+	"github.com/sx110903/llmatch-v2/backend/internal/adapters/storage"
+	applicationaccount "github.com/sx110903/llmatch-v2/backend/internal/application/account"
 	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
+	applicationprofile "github.com/sx110903/llmatch-v2/backend/internal/application/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/platform/config"
 	platformcrypto "github.com/sx110903/llmatch-v2/backend/internal/platform/crypto"
 	platformlogger "github.com/sx110903/llmatch-v2/backend/internal/platform/logger"
@@ -81,6 +86,25 @@ func run() error {
 	authHandler := httpauth.NewHandler(authService, cfg.IsProduction(), authCookiePath, cfg.AllowedOrigins)
 	authMiddleware := platformmiddleware.Auth(tokenIssuer, denylist, cfg.AuthCheckTimeout)
 
+	photoStorage, err := storage.New(startupContext, storage.Config{
+		Driver:       storage.Driver(cfg.PhotoStorageDriver),
+		LocalBaseDir: cfg.PhotoStorageLocalDir,
+		S3Bucket:     cfg.PhotoStorageS3Bucket,
+		S3Region:     cfg.PhotoStorageS3Region,
+		S3Endpoint:   cfg.PhotoStorageS3Endpoint,
+		S3PathStyle:  cfg.PhotoStorageS3PathStyle,
+	})
+	if err != nil {
+		return err
+	}
+	consentRepository := repositories.NewConsentRepository(postgresPool)
+	privacyService := applicationaccount.NewPrivacyService(consentRepository)
+	profileService := applicationprofile.NewService(
+		repositories.NewProfileRepository(postgresPool),
+		photoStorage,
+		privacyService,
+	)
+
 	healthService := applicationhealth.NewService(cfg.ReadinessTimeout,
 		postgres.Checker{Pool: postgresPool},
 		redisadapter.Checker{Client: redisClient},
@@ -91,6 +115,8 @@ func run() error {
 		Production:     cfg.IsProduction(),
 		Health:         httphealth.NewHandler(healthService),
 		Auth:           authHandler,
+		Profile:        httpprofile.NewHandler(profileService),
+		Account:        httpaccount.NewHandler(privacyService),
 		AuthMiddleware: authMiddleware,
 	})
 

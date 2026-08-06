@@ -41,6 +41,13 @@ type Config struct {
 	AllowedOrigins   []string
 	ReadinessTimeout time.Duration
 	ShutdownTimeout  time.Duration
+
+	PhotoStorageDriver      string
+	PhotoStorageLocalDir    string
+	PhotoStorageS3Bucket    string
+	PhotoStorageS3Region    string
+	PhotoStorageS3Endpoint  string
+	PhotoStorageS3PathStyle bool
 }
 
 type rawConfig struct {
@@ -105,6 +112,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	photoStoragePathStyle, err := boolEnv("PHOTO_STORAGE_S3_PATH_STYLE", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	config := Config{
 		Environment:      Environment(raw.Environment),
@@ -124,6 +135,13 @@ func Load() (Config, error) {
 		AllowedOrigins:   splitAndTrim(raw.AllowedOrigins),
 		ReadinessTimeout: readinessTimeout,
 		ShutdownTimeout:  shutdownTimeout,
+
+		PhotoStorageDriver:      getEnv("PHOTO_STORAGE_DRIVER", "local"),
+		PhotoStorageLocalDir:    getEnv("PHOTO_STORAGE_LOCAL_DIR", "./data/photos"),
+		PhotoStorageS3Bucket:    strings.TrimSpace(os.Getenv("PHOTO_STORAGE_S3_BUCKET")),
+		PhotoStorageS3Region:    strings.TrimSpace(os.Getenv("PHOTO_STORAGE_S3_REGION")),
+		PhotoStorageS3Endpoint:  strings.TrimSpace(os.Getenv("PHOTO_STORAGE_S3_ENDPOINT")),
+		PhotoStorageS3PathStyle: photoStoragePathStyle,
 	}
 
 	if err := validateURLs(config); err != nil {
@@ -133,6 +151,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if err := validateRSAKeyPair(config.JWTPrivateKey, config.JWTPublicKey, config.Environment == Production); err != nil {
+		return Config{}, err
+	}
+	if err := validatePhotoStorage(config); err != nil {
 		return Config{}, err
 	}
 	return config, nil
@@ -219,6 +240,22 @@ func validateOrigins(config Config) error {
 		if config.IsProduction() && parsed.Scheme != "https" {
 			return errors.New("production CORS origins must use HTTPS")
 		}
+	}
+	return nil
+}
+
+func validatePhotoStorage(config Config) error {
+	switch config.PhotoStorageDriver {
+	case "local":
+		if config.IsProduction() {
+			return errors.New("production must use PHOTO_STORAGE_DRIVER=s3, not local")
+		}
+	case "s3":
+		if config.PhotoStorageS3Bucket == "" || config.PhotoStorageS3Region == "" {
+			return errors.New("PHOTO_STORAGE_S3_BUCKET and PHOTO_STORAGE_S3_REGION are required when PHOTO_STORAGE_DRIVER=s3")
+		}
+	default:
+		return fmt.Errorf("PHOTO_STORAGE_DRIVER must be 'local' or 's3', got %q", config.PhotoStorageDriver)
 	}
 	return nil
 }
@@ -316,6 +353,18 @@ func durationEnv(key string, fallback time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("%s must be a positive duration", key)
 	}
 	return duration, nil
+}
+
+func boolEnv(key string, fallback bool) (bool, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean", key)
+	}
+	return parsed, nil
 }
 
 func int32Env(key string, fallback, minimum, maximum int32) (int32, error) {

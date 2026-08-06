@@ -6,8 +6,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 
+	httpaccount "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/account"
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
+	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	platformmiddleware "github.com/sx110903/llmatch-v2/backend/internal/platform/middleware"
 )
 
@@ -17,6 +19,8 @@ type RouterConfig struct {
 	Production     bool
 	Health         *httphealth.Handler
 	Auth           *httpauth.Handler
+	Profile        *httpprofile.Handler
+	Account        *httpaccount.Handler
 	AuthMiddleware func(http.Handler) http.Handler
 }
 
@@ -46,6 +50,25 @@ func NewRouter(config RouterConfig) http.Handler {
 				r.Post("/logout-all", config.Auth.LogoutAll)
 				r.Get("/me", config.Auth.Me)
 			})
+		})
+		r.Route("/profile", func(r chi.Router) {
+			r.Use(config.AuthMiddleware)
+			r.Get("/", config.Profile.GetProfile)
+			r.Put("/", config.Profile.UpdateProfile)
+			r.Get("/preferences", config.Profile.GetPreferences)
+			r.Put("/preferences", config.Profile.UpdatePreferences)
+			r.Get("/photos", config.Profile.ListPhotos)
+			r.Post("/photos", config.Profile.CreatePhoto)
+			r.Get("/photos/{photoID}/content", config.Profile.GetPhotoContent)
+			r.Put("/photos/order", config.Profile.ReorderPhotos)
+			r.Put("/photos/{photoID}/primary", config.Profile.SetPrimaryPhoto)
+			r.Delete("/photos/{photoID}", config.Profile.DeletePhoto)
+		})
+		r.Route("/account/consents", func(r chi.Router) {
+			r.Use(config.AuthMiddleware)
+			r.Post("/", config.Account.GrantConsent)
+			r.Get("/{purpose}", config.Account.GetConsent)
+			r.Delete("/{purpose}", config.Account.WithdrawConsent)
 		})
 	})
 
