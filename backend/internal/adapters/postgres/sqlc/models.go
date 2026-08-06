@@ -10,6 +10,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Photo struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	StorageKey string             `json:"storage_key"`
+	MimeType   string             `json:"mime_type"`
+	ByteSize   int64              `json:"byte_size"`
+	Width      int32              `json:"width"`
+	Height     int32              `json:"height"`
+	Position   int16              `json:"position"`
+	IsPrimary  bool               `json:"is_primary"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type PrivacyConsent struct {
+	ID            pgtype.UUID        `json:"id"`
+	UserID        pgtype.UUID        `json:"user_id"`
+	Purpose       string             `json:"purpose"`
+	PolicyVersion string             `json:"policy_version"`
+	GrantedAt     pgtype.Timestamptz `json:"granted_at"`
+	WithdrawnAt   pgtype.Timestamptz `json:"withdrawn_at"`
+	Source        string             `json:"source"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type Profile struct {
+	UserID              pgtype.UUID        `json:"user_id"`
+	Bio                 pgtype.Text        `json:"bio"`
+	Interests           []string           `json:"interests"`
+	City                pgtype.Text        `json:"city"`
+	Location            interface{}        `json:"location"`
+	Questionnaire       []byte             `json:"questionnaire"`
+	OnboardingCompleted bool               `json:"onboarding_completed"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RefreshToken struct {
 	ID           pgtype.UUID        `json:"id"`
 	UserID       pgtype.UUID        `json:"user_id"`
@@ -38,4 +75,14 @@ type User struct {
 	PasswordChangedAt pgtype.Timestamptz `json:"password_changed_at"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type UserPreference struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	MinAge        int16              `json:"min_age"`
+	MaxAge        int16              `json:"max_age"`
+	MaxDistanceKm int16              `json:"max_distance_km"`
+	Genders       []string           `json:"genders"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }

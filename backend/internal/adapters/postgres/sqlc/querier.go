@@ -11,17 +11,34 @@ import (
 )
 
 type Querier interface {
+	ClearGenders(ctx context.Context, userID pgtype.UUID) error
+	ClearPrimaryPhoto(ctx context.Context, userID pgtype.UUID) error
+	CountActivePhotos(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CreatePhoto(ctx context.Context, arg CreatePhotoParams) (Photo, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	FindActiveConsent(ctx context.Context, arg FindActiveConsentParams) (PrivacyConsent, error)
+	GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error)
+	GetPreferences(ctx context.Context, userID pgtype.UUID) (UserPreference, error)
+	GetProfile(ctx context.Context, userID pgtype.UUID) (GetProfileRow, error)
 	GetRefreshTokenByHash(ctx context.Context, tokenHash []byte) (RefreshToken, error)
 	GetRefreshTokenForUpdate(ctx context.Context, id pgtype.UUID) (RefreshToken, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	GrantConsent(ctx context.Context, arg GrantConsentParams) (PrivacyConsent, error)
+	ListPhotos(ctx context.Context, userID pgtype.UUID) ([]Photo, error)
 	Ping(ctx context.Context) (int64, error)
 	ReplaceRefreshToken(ctx context.Context, arg ReplaceRefreshTokenParams) error
 	RevokeAllRefreshTokensForUser(ctx context.Context, arg RevokeAllRefreshTokensForUserParams) error
 	RevokeRefreshTokenFamily(ctx context.Context, arg RevokeRefreshTokenFamilyParams) error
+	SetPhotoPosition(ctx context.Context, arg SetPhotoPositionParams) error
+	SetPrimaryPhoto(ctx context.Context, arg SetPrimaryPhotoParams) error
+	SoftDeletePhoto(ctx context.Context, arg SoftDeletePhotoParams) error
+	UpdateGenders(ctx context.Context, arg UpdateGendersParams) error
 	UpdateUserPasswordHash(ctx context.Context, arg UpdateUserPasswordHashParams) error
+	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) error
+	UpsertProfile(ctx context.Context, arg UpsertProfileParams) error
+	WithdrawActiveConsent(ctx context.Context, arg WithdrawActiveConsentParams) error
 }
 
 var _ Querier = (*Queries)(nil)
