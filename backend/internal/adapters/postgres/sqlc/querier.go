@@ -11,22 +11,38 @@ import (
 )
 
 type Querier interface {
+	CanSwipeTarget(ctx context.Context, arg CanSwipeTargetParams) (bool, error)
 	ClearGenders(ctx context.Context, userID pgtype.UUID) error
 	ClearPrimaryPhoto(ctx context.Context, userID pgtype.UUID) error
 	CountActivePhotos(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountSwipesSince(ctx context.Context, arg CountSwipesSinceParams) (int64, error)
 	CreatePhoto(ctx context.Context, arg CreatePhotoParams) (Photo, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	EnsureDiscoveryReady(ctx context.Context, userID pgtype.UUID) (bool, error)
 	FindActiveConsent(ctx context.Context, arg FindActiveConsentParams) (PrivacyConsent, error)
+	GetMatchByPair(ctx context.Context, arg GetMatchByPairParams) (Match, error)
 	GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error)
 	GetPreferences(ctx context.Context, userID pgtype.UUID) (UserPreference, error)
 	GetProfile(ctx context.Context, userID pgtype.UUID) (GetProfileRow, error)
 	GetRefreshTokenByHash(ctx context.Context, tokenHash []byte) (RefreshToken, error)
 	GetRefreshTokenForUpdate(ctx context.Context, id pgtype.UUID) (RefreshToken, error)
+	GetSwipe(ctx context.Context, arg GetSwipeParams) (Swipe, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	GetVisibleMatchingPhoto(ctx context.Context, arg GetVisibleMatchingPhotoParams) (GetVisibleMatchingPhotoRow, error)
 	GrantConsent(ctx context.Context, arg GrantConsentParams) (PrivacyConsent, error)
+	HasPositiveReverseSwipe(ctx context.Context, arg HasPositiveReverseSwipeParams) (bool, error)
+	InsertBlock(ctx context.Context, arg InsertBlockParams) error
+	InsertMatch(ctx context.Context, arg InsertMatchParams) (Match, error)
+	InsertReport(ctx context.Context, arg InsertReportParams) (Report, error)
+	InsertSwipe(ctx context.Context, arg InsertSwipeParams) (Swipe, error)
+	InteractionBlocked(ctx context.Context, arg InteractionBlockedParams) (bool, error)
+	ListActiveMatches(ctx context.Context, arg ListActiveMatchesParams) ([]ListActiveMatchesRow, error)
+	ListDiscoveryCandidates(ctx context.Context, arg ListDiscoveryCandidatesParams) ([]ListDiscoveryCandidatesRow, error)
 	ListPhotos(ctx context.Context, userID pgtype.UUID) ([]Photo, error)
+	LockInteractionPair(ctx context.Context, arg LockInteractionPairParams) error
+	MatchParticipantExists(ctx context.Context, arg MatchParticipantExistsParams) (bool, error)
 	Ping(ctx context.Context) (int64, error)
 	ReplaceRefreshToken(ctx context.Context, arg ReplaceRefreshTokenParams) error
 	RevokeAllRefreshTokensForUser(ctx context.Context, arg RevokeAllRefreshTokensForUserParams) error
@@ -34,6 +50,9 @@ type Querier interface {
 	SetPhotoPosition(ctx context.Context, arg SetPhotoPositionParams) error
 	SetPrimaryPhoto(ctx context.Context, arg SetPrimaryPhotoParams) error
 	SoftDeletePhoto(ctx context.Context, arg SoftDeletePhotoParams) error
+	TouchUserActivity(ctx context.Context, arg TouchUserActivityParams) error
+	Unmatch(ctx context.Context, arg UnmatchParams) (int64, error)
+	UnmatchPairForBlock(ctx context.Context, arg UnmatchPairForBlockParams) error
 	UpdateGenders(ctx context.Context, arg UpdateGendersParams) error
 	UpdateUserPasswordHash(ctx context.Context, arg UpdateUserPasswordHashParams) error
 	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) error
