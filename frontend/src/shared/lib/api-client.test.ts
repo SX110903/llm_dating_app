@@ -108,9 +108,13 @@ describe("apiFetch", () => {
     })
     vi.stubGlobal("fetch", fetchMock)
 
-    const blob = await apiFetchBlob("/matching/photos/photo-id/content")
+    const blob = await apiFetchBlob("/api/v1/matching/photos/photo-id/content")
 
     expect(blob.type).toBe("image/png")
     expect(await blob.text()).toBe("image-bytes")
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/matching/photos/photo-id/content",
+      expect.any(Object),
+    )
   })
 })

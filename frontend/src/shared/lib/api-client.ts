@@ -82,7 +82,7 @@ async function fetchWithRefresh(path: string, options: ApiFetchOptions): Promise
     if (auth && accessToken) {
       requestHeaders.set("Authorization", `Bearer ${accessToken}`)
     }
-    return fetch(`${environment.VITE_API_BASE_URL}${path}`, {
+    return fetch(resolveApiURL(path), {
       ...rest,
       credentials: "include",
       headers: requestHeaders,
@@ -110,4 +110,18 @@ async function fetchWithRefresh(path: string, options: ApiFetchOptions): Promise
   }
 
 	return response
+}
+
+function resolveApiURL(path: string): string {
+  const base = environment.VITE_API_BASE_URL.replace(/\/$/, "")
+  if (path === base || path.startsWith(`${base}/`)) return path
+
+  if (/^https?:\/\//i.test(base)) {
+    const parsedBase = new URL(base)
+    if (path === parsedBase.pathname || path.startsWith(`${parsedBase.pathname}/`)) {
+      return new URL(path, parsedBase.origin).toString()
+    }
+  }
+
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`
 }
