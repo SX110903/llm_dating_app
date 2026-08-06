@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -87,6 +88,15 @@ func (r *MatchingRepository) FindSwipe(
 	ctx context.Context,
 	actorID, targetID uuid.UUID,
 ) (*domainmatching.SwipeOutcome, error) {
+	blocked, err := r.queries.InteractionBlocked(ctx, db.InteractionBlockedParams{
+		FirstUserID: toPgUUID(actorID), SecondUserID: toPgUUID(targetID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("check interaction block: %w", err)
+	}
+	if blocked {
+		return nil, domainmatching.ErrInteractionBlocked
+	}
 	return findSwipeOutcome(ctx, r.queries, actorID, targetID)
 }
 
@@ -258,6 +268,9 @@ func (r *MatchingRepository) Block(ctx context.Context, blockerID, blockedID uui
 	if err := qtx.InsertBlock(ctx, db.InsertBlockParams{
 		BlockerID: toPgUUID(blockerID), BlockedID: toPgUUID(blockedID), CreatedAt: toPgTimestamptz(at),
 	}); err != nil {
+		if isForeignKeyViolation(err) {
+			return domainmatching.ErrNotFound
+		}
 		return fmt.Errorf("insert block: %w", err)
 	}
 	if err := qtx.UnmatchPairForBlock(ctx, db.UnmatchPairForBlockParams{
@@ -282,6 +295,9 @@ func (r *MatchingRepository) CreateReport(ctx context.Context, report *domainmat
 		CreatedAt:   toPgTimestamptz(report.CreatedAt),
 	})
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return domainmatching.ErrNotFound
+		}
 		return fmt.Errorf("insert report: %w", err)
 	}
 	*report = reportFromRow(row)
@@ -363,4 +379,9 @@ func reportFromRow(row db.Report) domainmatching.Report {
 		Status: domainmatching.ReportStatus(row.Status), CreatedAt: fromPgTimestamptz(row.CreatedAt),
 		ResolvedAt: fromPgTimestamptzPtr(row.ResolvedAt),
 	}
+}
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
