@@ -24,6 +24,7 @@ import (
 	httpaccount "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/account"
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
+	httpmatching "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/matching"
 	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
@@ -32,7 +33,9 @@ import (
 	applicationaccount "github.com/sx110903/llmatch-v2/backend/internal/application/account"
 	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
+	applicationmatching "github.com/sx110903/llmatch-v2/backend/internal/application/matching"
 	applicationprofile "github.com/sx110903/llmatch-v2/backend/internal/application/profile"
+	domainmatching "github.com/sx110903/llmatch-v2/backend/internal/domain/matching"
 	platformcrypto "github.com/sx110903/llmatch-v2/backend/internal/platform/crypto"
 	platformmiddleware "github.com/sx110903/llmatch-v2/backend/internal/platform/middleware"
 )
@@ -100,6 +103,17 @@ func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Cl
 	consentRepository := repositories.NewConsentRepository(pool)
 	privacyService := applicationaccount.NewPrivacyService(consentRepository)
 	profileService := applicationprofile.NewService(repositories.NewProfileRepository(pool), photoStorage, privacyService)
+	matchingService := applicationmatching.NewService(
+		repositories.NewMatchingRepository(pool),
+		redisadapter.NewSwipeLimiter(redisClient),
+		photoStorage,
+		applicationmatching.Config{
+			DailySwipeLimit: 100,
+			RankingWeights: domainmatching.RankingWeights{
+				Interests: 0.35, Questionnaire: 0.30, Distance: 0.20, Activity: 0.15,
+			},
+		},
+	)
 
 	router := httpadapter.NewRouter(httpadapter.RouterConfig{
 		Logger:         zerolog.Nop(),
@@ -109,6 +123,7 @@ func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Cl
 		Auth:           authHandler,
 		Profile:        httpprofile.NewHandler(profileService),
 		Account:        httpaccount.NewHandler(privacyService),
+		Matching:       httpmatching.NewHandler(matchingService),
 		AuthMiddleware: authMiddleware,
 	})
 

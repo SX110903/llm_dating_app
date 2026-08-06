@@ -52,6 +52,23 @@ func TestLoadAcceptsCompleteDevelopmentConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, config.Development, loaded.Environment)
 	assert.Equal(t, []string{"http://localhost:8080"}, loaded.AllowedOrigins)
+	assert.Equal(t, 100, loaded.MatchingDailySwipeLimit)
+	assert.InDelta(t, 0.35, loaded.MatchingWeightInterests, 0.0001)
+	assert.InDelta(t, 0.30, loaded.MatchingWeightQuestionnaire, 0.0001)
+	assert.InDelta(t, 0.20, loaded.MatchingWeightDistance, 0.0001)
+	assert.InDelta(t, 0.15, loaded.MatchingWeightActivity, 0.0001)
+}
+
+func TestLoadRejectsMatchingWeightsWithZeroTotal(t *testing.T) {
+	setBaseEnvironment(t)
+	t.Setenv("MATCHING_WEIGHT_INTERESTS", "0")
+	t.Setenv("MATCHING_WEIGHT_QUESTIONNAIRE", "0")
+	t.Setenv("MATCHING_WEIGHT_DISTANCE", "0")
+	t.Setenv("MATCHING_WEIGHT_ACTIVITY", "0")
+
+	_, err := config.Load()
+
+	require.EqualError(t, err, "at least one MATCHING_WEIGHT_* value must be greater than zero")
 }
 
 func setBaseEnvironment(t *testing.T) {

@@ -48,6 +48,12 @@ type Config struct {
 	PhotoStorageS3Region    string
 	PhotoStorageS3Endpoint  string
 	PhotoStorageS3PathStyle bool
+
+	MatchingDailySwipeLimit     int
+	MatchingWeightInterests     float64
+	MatchingWeightQuestionnaire float64
+	MatchingWeightDistance      float64
+	MatchingWeightActivity      float64
 }
 
 type rawConfig struct {
@@ -116,6 +122,29 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	dailySwipeLimit, err := int32Env("MATCHING_DAILY_SWIPE_LIMIT", 100, 1, 10000)
+	if err != nil {
+		return Config{}, err
+	}
+	matchingWeightInterests, err := float64Env("MATCHING_WEIGHT_INTERESTS", 0.35, 0, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	matchingWeightQuestionnaire, err := float64Env("MATCHING_WEIGHT_QUESTIONNAIRE", 0.30, 0, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	matchingWeightDistance, err := float64Env("MATCHING_WEIGHT_DISTANCE", 0.20, 0, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	matchingWeightActivity, err := float64Env("MATCHING_WEIGHT_ACTIVITY", 0.15, 0, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	if matchingWeightInterests+matchingWeightQuestionnaire+matchingWeightDistance+matchingWeightActivity <= 0 {
+		return Config{}, errors.New("at least one MATCHING_WEIGHT_* value must be greater than zero")
+	}
 
 	config := Config{
 		Environment:      Environment(raw.Environment),
@@ -142,6 +171,12 @@ func Load() (Config, error) {
 		PhotoStorageS3Region:    strings.TrimSpace(os.Getenv("PHOTO_STORAGE_S3_REGION")),
 		PhotoStorageS3Endpoint:  strings.TrimSpace(os.Getenv("PHOTO_STORAGE_S3_ENDPOINT")),
 		PhotoStorageS3PathStyle: photoStoragePathStyle,
+
+		MatchingDailySwipeLimit:     int(dailySwipeLimit),
+		MatchingWeightInterests:     matchingWeightInterests,
+		MatchingWeightQuestionnaire: matchingWeightQuestionnaire,
+		MatchingWeightDistance:      matchingWeightDistance,
+		MatchingWeightActivity:      matchingWeightActivity,
 	}
 
 	if err := validateURLs(config); err != nil {
@@ -377,4 +412,16 @@ func int32Env(key string, fallback, minimum, maximum int32) (int32, error) {
 		return 0, fmt.Errorf("%s must be between %d and %d", key, minimum, maximum)
 	}
 	return int32(parsed), nil
+}
+
+func float64Env(key string, fallback, minimum, maximum float64) (float64, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed < minimum || parsed > maximum {
+		return 0, fmt.Errorf("%s must be between %g and %g", key, minimum, maximum)
+	}
+	return parsed, nil
 }

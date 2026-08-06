@@ -9,6 +9,7 @@ import (
 	httpaccount "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/account"
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
+	httpmatching "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/matching"
 	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	platformmiddleware "github.com/sx110903/llmatch-v2/backend/internal/platform/middleware"
 )
@@ -21,6 +22,7 @@ type RouterConfig struct {
 	Auth           *httpauth.Handler
 	Profile        *httpprofile.Handler
 	Account        *httpaccount.Handler
+	Matching       *httpmatching.Handler
 	AuthMiddleware func(http.Handler) http.Handler
 }
 
@@ -69,6 +71,16 @@ func NewRouter(config RouterConfig) http.Handler {
 			r.Post("/", config.Account.GrantConsent)
 			r.Get("/{purpose}", config.Account.GetConsent)
 			r.Delete("/{purpose}", config.Account.WithdrawConsent)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(config.AuthMiddleware)
+			r.Get("/discovery", config.Matching.Discover)
+			r.Post("/swipes", config.Matching.Swipe)
+			r.Get("/matches", config.Matching.ListMatches)
+			r.Delete("/matches/{matchID}", config.Matching.Unmatch)
+			r.Post("/blocks", config.Matching.Block)
+			r.Post("/reports", config.Matching.Report)
+			r.Get("/matching/photos/{photoID}/content", config.Matching.GetPhotoContent)
 		})
 	})
 

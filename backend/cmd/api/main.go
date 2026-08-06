@@ -14,6 +14,7 @@ import (
 	httpaccount "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/account"
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
+	httpmatching "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/matching"
 	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
@@ -22,7 +23,9 @@ import (
 	applicationaccount "github.com/sx110903/llmatch-v2/backend/internal/application/account"
 	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
+	applicationmatching "github.com/sx110903/llmatch-v2/backend/internal/application/matching"
 	applicationprofile "github.com/sx110903/llmatch-v2/backend/internal/application/profile"
+	domainmatching "github.com/sx110903/llmatch-v2/backend/internal/domain/matching"
 	"github.com/sx110903/llmatch-v2/backend/internal/platform/config"
 	platformcrypto "github.com/sx110903/llmatch-v2/backend/internal/platform/crypto"
 	platformlogger "github.com/sx110903/llmatch-v2/backend/internal/platform/logger"
@@ -104,6 +107,20 @@ func run() error {
 		photoStorage,
 		privacyService,
 	)
+	matchingService := applicationmatching.NewService(
+		repositories.NewMatchingRepository(postgresPool),
+		redisadapter.NewSwipeLimiter(redisClient),
+		photoStorage,
+		applicationmatching.Config{
+			DailySwipeLimit: cfg.MatchingDailySwipeLimit,
+			RankingWeights: domainmatching.RankingWeights{
+				Interests:     cfg.MatchingWeightInterests,
+				Questionnaire: cfg.MatchingWeightQuestionnaire,
+				Distance:      cfg.MatchingWeightDistance,
+				Activity:      cfg.MatchingWeightActivity,
+			},
+		},
+	)
 
 	healthService := applicationhealth.NewService(cfg.ReadinessTimeout,
 		postgres.Checker{Pool: postgresPool},
@@ -117,6 +134,7 @@ func run() error {
 		Auth:           authHandler,
 		Profile:        httpprofile.NewHandler(profileService),
 		Account:        httpaccount.NewHandler(privacyService),
+		Matching:       httpmatching.NewHandler(matchingService),
 		AuthMiddleware: authMiddleware,
 	})
 
