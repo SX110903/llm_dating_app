@@ -10,6 +10,7 @@ import (
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
 	httpmatching "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/matching"
+	httpmessaging "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/messaging"
 	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	platformmiddleware "github.com/sx110903/llmatch-v2/backend/internal/platform/middleware"
 )
@@ -23,6 +24,10 @@ type RouterConfig struct {
 	Profile        *httpprofile.Handler
 	Account        *httpaccount.Handler
 	Matching       *httpmatching.Handler
+	Messaging      *httpmessaging.Handler
+	// WebSocket authenticates with its own single-use ticket instead of the
+	// bearer middleware, so it is mounted outside the protected group.
+	WebSocket      http.Handler
 	AuthMiddleware func(http.Handler) http.Handler
 }
 
@@ -81,7 +86,20 @@ func NewRouter(config RouterConfig) http.Handler {
 			r.Post("/blocks", config.Matching.Block)
 			r.Post("/reports", config.Matching.Report)
 			r.Get("/matching/photos/{photoID}/content", config.Matching.GetPhotoContent)
+
+			r.Get("/conversations", config.Messaging.ListConversations)
+			r.Get("/matches/{matchID}/messages", config.Messaging.History)
+			r.Post("/matches/{matchID}/messages", config.Messaging.Send)
+			r.Post("/matches/{matchID}/messages/read", config.Messaging.MarkRead)
+			r.Post("/messaging/tickets", config.Messaging.IssueTicket)
 		})
+
+		// Outside the bearer group on purpose: browsers cannot set an
+		// Authorization header on a WebSocket handshake, so this route
+		// authenticates with the single-use ticket instead.
+		if config.WebSocket != nil {
+			r.Handle("/ws", config.WebSocket)
+		}
 	})
 
 	return router

@@ -15,15 +15,18 @@ import (
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
 	httpmatching "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/matching"
+	httpmessaging "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/messaging"
 	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
 	redisadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/redis"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/storage"
+	websocketadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/websocket"
 	applicationaccount "github.com/sx110903/llmatch-v2/backend/internal/application/account"
 	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
 	applicationmatching "github.com/sx110903/llmatch-v2/backend/internal/application/matching"
+	applicationmessaging "github.com/sx110903/llmatch-v2/backend/internal/application/messaging"
 	applicationprofile "github.com/sx110903/llmatch-v2/backend/internal/application/profile"
 	domainmatching "github.com/sx110903/llmatch-v2/backend/internal/domain/matching"
 	"github.com/sx110903/llmatch-v2/backend/internal/platform/config"
@@ -122,6 +125,39 @@ func run() error {
 		},
 	)
 
+	messageBus := redisadapter.NewMessageBus(redisClient)
+	messagingService := applicationmessaging.NewService(
+		repositories.NewMessagingRepository(postgresPool),
+		redisadapter.NewWSTicketStore(redisClient),
+		messageBus,
+		redisadapter.NewMessageRateLimiter(redisClient, cfg.MessagingRateWindow, cfg.MessagingRateLimit),
+		applicationmessaging.Config{TicketTTL: cfg.MessagingTicketTTL},
+	)
+	websocketHandler := websocketadapter.NewHandler(
+		messagingService,
+		websocketadapter.NewHub(),
+		logger,
+		cfg.AllowedOrigins,
+		websocketadapter.Config{
+			ReadLimitBytes:        cfg.MessagingSocketReadLimitBytes,
+			QueueSize:             cfg.MessagingSocketQueueSize,
+			WriteTimeout:          cfg.MessagingSocketWriteTimeout,
+			PingInterval:          cfg.MessagingSocketPingInterval,
+			ReadTimeout:           cfg.MessagingSocketReadTimeout,
+			ClientEventsPerMinute: cfg.MessagingClientEventsPerMinute,
+		},
+	)
+
+	// Every replica subscribes to the shared channel, so a message persisted
+	// by one instance reaches sockets held by any other.
+	busContext, stopBus := context.WithCancel(context.Background())
+	defer stopBus()
+	go func() {
+		if err := messageBus.Subscribe(busContext, websocketHandler.Broadcast); err != nil && busContext.Err() == nil {
+			logger.Error().Err(err).Msg("message bus subscription stopped")
+		}
+	}()
+
 	healthService := applicationhealth.NewService(cfg.ReadinessTimeout,
 		postgres.Checker{Pool: postgresPool},
 		redisadapter.Checker{Client: redisClient},
@@ -135,6 +171,8 @@ func run() error {
 		Profile:        httpprofile.NewHandler(profileService),
 		Account:        httpaccount.NewHandler(privacyService),
 		Matching:       httpmatching.NewHandler(matchingService),
+		Messaging:      httpmessaging.NewHandler(messagingService),
+		WebSocket:      websocketHandler,
 		AuthMiddleware: authMiddleware,
 	})
 

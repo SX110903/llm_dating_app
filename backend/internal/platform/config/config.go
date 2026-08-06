@@ -54,6 +54,16 @@ type Config struct {
 	MatchingWeightQuestionnaire float64
 	MatchingWeightDistance      float64
 	MatchingWeightActivity      float64
+
+	MessagingTicketTTL             time.Duration
+	MessagingRateWindow            time.Duration
+	MessagingRateLimit             int
+	MessagingSocketQueueSize       int
+	MessagingSocketReadLimitBytes  int64
+	MessagingSocketWriteTimeout    time.Duration
+	MessagingSocketPingInterval    time.Duration
+	MessagingSocketReadTimeout     time.Duration
+	MessagingClientEventsPerMinute int
 }
 
 type rawConfig struct {
@@ -146,6 +156,48 @@ func Load() (Config, error) {
 		return Config{}, errors.New("at least one MATCHING_WEIGHT_* value must be greater than zero")
 	}
 
+	// The ticket TTL is deliberately short: it only has to survive the round
+	// trip between issuing it and opening the socket.
+	messagingTicketTTL, err := durationEnv("MESSAGING_TICKET_TTL", 30*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingRateWindow, err := durationEnv("MESSAGING_RATE_WINDOW", time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingRateLimit, err := int32Env("MESSAGING_RATE_LIMIT", 60, 1, 10_000)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingQueueSize, err := int32Env("MESSAGING_SOCKET_QUEUE_SIZE", 64, 1, 10_000)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingReadLimit, err := int32Env("MESSAGING_SOCKET_READ_LIMIT_BYTES", 32*1024, 1024, 1024*1024)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingWriteTimeout, err := durationEnv("MESSAGING_SOCKET_WRITE_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingPingInterval, err := durationEnv("MESSAGING_SOCKET_PING_INTERVAL", 25*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingReadTimeout, err := durationEnv("MESSAGING_SOCKET_READ_TIMEOUT", 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	messagingClientEvents, err := int32Env("MESSAGING_CLIENT_EVENTS_PER_MINUTE", 120, 1, 10_000)
+	if err != nil {
+		return Config{}, err
+	}
+	if messagingPingInterval >= messagingReadTimeout {
+		return Config{}, errors.New("MESSAGING_SOCKET_PING_INTERVAL must be shorter than MESSAGING_SOCKET_READ_TIMEOUT")
+	}
+
 	config := Config{
 		Environment:      Environment(raw.Environment),
 		HTTPAddress:      raw.HTTPAddress,
@@ -177,6 +229,16 @@ func Load() (Config, error) {
 		MatchingWeightQuestionnaire: matchingWeightQuestionnaire,
 		MatchingWeightDistance:      matchingWeightDistance,
 		MatchingWeightActivity:      matchingWeightActivity,
+
+		MessagingTicketTTL:             messagingTicketTTL,
+		MessagingRateWindow:            messagingRateWindow,
+		MessagingRateLimit:             int(messagingRateLimit),
+		MessagingSocketQueueSize:       int(messagingQueueSize),
+		MessagingSocketReadLimitBytes:  int64(messagingReadLimit),
+		MessagingSocketWriteTimeout:    messagingWriteTimeout,
+		MessagingSocketPingInterval:    messagingPingInterval,
+		MessagingSocketReadTimeout:     messagingReadTimeout,
+		MessagingClientEventsPerMinute: int(messagingClientEvents),
 	}
 
 	if err := validateURLs(config); err != nil {

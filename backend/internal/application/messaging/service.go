@@ -131,10 +131,11 @@ func (s *Service) Send(ctx context.Context, in SendInput) (*domainmessaging.Send
 			Message:     result.Message,
 			MessageJSON: NewMessagePayload(result.Message),
 		}
-		if err := s.publisher.Publish(ctx, event); err != nil {
-			// The message is already durable; a fan-out failure degrades to
-			// "not delivered live", which the client recovers over HTTP.
-			return result, nil
+		if publishErr := s.publisher.Publish(ctx, event); publishErr != nil {
+			// The message is already durable, so the send succeeded. Losing the
+			// fan-out only costs live delivery, which the client recovers over
+			// HTTP from its last cursor.
+			return result, nil //nolint:nilerr // persistence is the contract; live delivery is best-effort
 		}
 	}
 	return result, nil
