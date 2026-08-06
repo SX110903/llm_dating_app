@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: LLMatch API
-  version: 0.2.0
-  description: Contrato hasta la Fase 1. Expone comprobaciones de salud y autenticación.
+  version: 0.3.0
+  description: Contrato hasta la Fase 2. Expone comprobaciones de salud, autenticación y gestión de perfil.
 servers:
   - url: /api/v1
 paths:
@@ -201,6 +201,304 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /profile:
+    get:
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Perfil del usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "404":
+          description: Todavía no se ha creado el perfil.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o ya revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "422":
+          description: Faltan campos obligatorios para completar el onboarding.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o ya revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile/preferences:
+    get:
+      operationId: getPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Preferencias del usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Preferences"
+        "404":
+          description: Todavía no se han creado preferencias.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updatePreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreferencesRequest"
+      responses:
+        "200":
+          description: Preferencias actualizadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Preferences"
+        "422":
+          description: Rango de edad/distancia inválido o falta consentimiento para guardar genders.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile/photos:
+    get:
+      operationId: listPhotos
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Fotos del usuario autenticado, ordenadas por posición.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Photo"
+    post:
+      operationId: createPhoto
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Foto creada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+        "413":
+          description: La foto supera los 10 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Formato no soportado o límite de 6 fotos alcanzado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile/photos/{photoID}/content:
+    get:
+      operationId: getPhotoContent
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: photoID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Contenido binario de la foto.
+          content:
+            image/jpeg: {}
+            image/png: {}
+            image/webp: {}
+        "404":
+          description: Foto no encontrada o no pertenece al usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile/photos/order:
+    put:
+      operationId: reorderPhotos
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo_ids]
+              properties:
+                photo_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "204":
+          description: Orden actualizado.
+        "422":
+          description: El conjunto de ids no coincide con las fotos actuales del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile/photos/{photoID}/primary:
+    put:
+      operationId: setPrimaryPhoto
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: photoID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Foto marcada como principal.
+        "404":
+          description: Foto no encontrada o no pertenece al usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /profile/photos/{photoID}:
+    delete:
+      operationId: deletePhoto
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: photoID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Foto borrada lógicamente; la limpieza del blob es asíncrona.
+        "404":
+          description: Foto no encontrada o no pertenece al usuario.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /account/consents:
+    post:
+      operationId: grantConsent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentRequest"
+      responses:
+        "201":
+          description: Consentimiento otorgado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consent"
+        "409":
+          description: Ya existe un consentimiento activo para este propósito.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /account/consents/{purpose}:
+    get:
+      operationId: getConsent
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: purpose
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Consentimiento activo para este propósito.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Consent"
+        "404":
+          description: No hay consentimiento activo para este propósito.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: withdrawConsent
+      security:
+        - bearerAuth: []
+      description: Retira el consentimiento y borra transaccionalmente el valor sensible asociado (genders).
+      parameters:
+        - name: purpose
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Consentimiento retirado.
 components:
   securitySchemes:
     bearerAuth:
@@ -301,3 +599,139 @@ components:
           type: object
           additionalProperties:
             type: string
+    Profile:
+      type: object
+      required:
+        [user_id, bio, interests, city, has_location, questionnaire, onboarding_completed, created_at, updated_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        bio:
+          type: string
+          maxLength: 500
+        interests:
+          type: array
+          items:
+            type: string
+        city:
+          type: string
+        has_location:
+          type: boolean
+        questionnaire:
+          type: object
+          additionalProperties: true
+        onboarding_completed:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpdateProfileRequest:
+      type: object
+      properties:
+        bio:
+          type: string
+          maxLength: 500
+        interests:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 40
+        city:
+          type: string
+          maxLength: 120
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        questionnaire:
+          type: object
+          additionalProperties: true
+        onboarding_completed:
+          type: boolean
+    Preferences:
+      type: object
+      required: [min_age, max_age, max_distance_km, genders]
+      properties:
+        min_age:
+          type: integer
+        max_age:
+          type: integer
+        max_distance_km:
+          type: integer
+        genders:
+          type: array
+          items:
+            type: string
+    UpdatePreferencesRequest:
+      type: object
+      required: [min_age, max_age, max_distance_km]
+      properties:
+        min_age:
+          type: integer
+          minimum: 18
+          maximum: 100
+        max_age:
+          type: integer
+          minimum: 18
+          maximum: 100
+        max_distance_km:
+          type: integer
+          minimum: 1
+          maximum: 500
+        genders:
+          description: Categoría especial (RGPD art. 9); omitir para no modificarlo, requiere consentimiento activo para guardarlo.
+          type: array
+          items:
+            type: string
+    Photo:
+      type: object
+      required: [id, mime_type, byte_size, width, height, position, is_primary, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        mime_type:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        byte_size:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+        position:
+          type: integer
+          minimum: 0
+          maximum: 5
+        is_primary:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    ConsentRequest:
+      type: object
+      required: [purpose]
+      properties:
+        purpose:
+          type: string
+          enum: [matching_gender_preferences]
+    Consent:
+      type: object
+      required: [purpose, policy_version, granted_at]
+      properties:
+        purpose:
+          type: string
+        policy_version:
+          type: string
+        granted_at:
+          type: string
+          format: date-time

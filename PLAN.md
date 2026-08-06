@@ -1,6 +1,6 @@
 # LLMatch v2 — plan de ejecución
 
-Estado: **aprobado el 5 de agosto de 2026**. La Fase 0 y la Fase 1 están implementadas y validadas; no se iniciará la Fase 2 sin la revisión y confirmación previstas entre fases.
+Estado: **aprobado el 5 de agosto de 2026**. Las Fases 0, 1 y 2 están implementadas y validadas; no se iniciará la Fase 3 sin la revisión y confirmación previstas entre fases.
 
 ## 1. Alcance y decisiones cerradas
 

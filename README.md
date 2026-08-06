@@ -1,6 +1,6 @@
 # LLMatch v2
 
-Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente están implementadas la **Fase 0 — Fundación** y la **Fase 1 — Auth**.
+Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente están implementadas la **Fase 0 — Fundación**, la **Fase 1 — Auth** y la **Fase 2 — Perfil y fotos**.
 
 ## Requisitos
 
@@ -70,4 +70,11 @@ Healthchecks:
 - Refresh token opaco de 256 bits en cookie `HttpOnly`, `Secure` en producción, `SameSite=Strict` y `Path=/api/v1/auth`; rota en cada uso y revoca toda su familia si se detecta reutilización.
 - El middleware de rutas autenticadas es fail-closed: si Redis no responde al comprobar el `jti`, la respuesta es `503 AUTH_DEPENDENCY_UNAVAILABLE` y el handler protegido nunca se ejecuta.
 - Rate limiting distribuido en Redis por IP y por email normalizado, con backoff progresivo ante intentos repetidos en register y login.
-- El resto de funcionalidades (perfiles, discovery, mensajería, verificación de email, recuperación de contraseña) no pertenecen a esta fase y no se anuncian como implementadas.
+
+## Perfil y fotos (Fase 2)
+
+- Endpoints `GET/PUT /profile`, `GET/PUT /profile/preferences`, `GET/POST /profile/photos`, `GET /profile/photos/{id}/content`, `PUT /profile/photos/order`, `PUT /profile/photos/{id}/primary`, `DELETE /profile/photos/{id}` y `POST/GET/DELETE /account/consents[/{purpose}]`. Contrato completo en [api/openapi.yaml](api/openapi.yaml).
+- `user_preferences.genders` es una categoría especial (RGPD art. 9): nunca se guarda sin un consentimiento activo y separado en `privacy_consents`; retirarlo borra el valor en la misma transacción que revoca el consentimiento.
+- Fotos: máximo 6, JPEG/PNG/WebP hasta 10 MiB, MIME y dimensiones detectados decodificando el contenido real (nunca la extensión ni el nombre original), clave de almacenamiento basada en UUID. Storage local en desarrollo, S3 (AWS SDK v2) en producción, con compensación automática si falla la base de datos tras subir el blob.
+- Borrado de foto: lógico y síncrono; la limpieza del blob es asíncrona y best-effort. Si se borra la foto principal, se promueve automáticamente otra restante.
+- El resto de funcionalidades (discovery, mensajería, verificación de email, recuperación de contraseña) no pertenecen a esta fase y no se anuncian como implementadas.
