@@ -19,8 +19,11 @@ export interface UpdateProfileInput {
   bio: string
   interests: string[]
   city: string
-  latitude?: number | null
-  longitude?: number | null
+  /** Send both or neither: omitting them preserves the stored location. */
+  latitude?: number
+  longitude?: number
+  /** The only way to remove a stored location. */
+  clear_location?: boolean
   questionnaire?: Record<string, unknown>
   onboarding_completed: boolean
 }

@@ -1,11 +1,14 @@
 package profile
 
 type UpdateProfileRequest struct {
-	Bio                 string         `json:"bio" validate:"max=500"`
-	Interests           []string       `json:"interests" validate:"max=20,dive,max=40"`
-	City                string         `json:"city" validate:"max=120"`
+	Bio       string   `json:"bio" validate:"max=500"`
+	Interests []string `json:"interests" validate:"max=20,dive,max=40"`
+	City      string   `json:"city" validate:"max=120"`
+	// Omitting both coordinates preserves the stored location. ClearLocation
+	// is the only way to remove it.
 	Latitude            *float64       `json:"latitude" validate:"omitempty,min=-90,max=90"`
 	Longitude           *float64       `json:"longitude" validate:"omitempty,min=-180,max=180"`
+	ClearLocation       bool           `json:"clear_location"`
 	Questionnaire       map[string]any `json:"questionnaire"`
 	OnboardingCompleted bool           `json:"onboarding_completed"`
 }

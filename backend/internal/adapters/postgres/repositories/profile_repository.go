@@ -73,6 +73,7 @@ func (r *ProfileRepository) UpsertProfile(ctx context.Context, p *domainprofile.
 		Latitude:            latitude,
 		Questionnaire:       questionnaire,
 		OnboardingCompleted: p.OnboardingCompleted,
+		ClearLocation:       p.ClearLocation,
 	})
 }
 

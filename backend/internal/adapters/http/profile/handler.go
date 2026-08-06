@@ -88,15 +88,21 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		City:                h.sanitize(req.City),
 		Latitude:            req.Latitude,
 		Longitude:           req.Longitude,
+		ClearLocation:       req.ClearLocation,
 		Questionnaire:       h.sanitizeQuestionnaire(req.Questionnaire),
 		OnboardingCompleted: req.OnboardingCompleted,
 	})
 	if err != nil {
-		if errors.Is(err, applicationprofile.ErrOnboardingIncomplete) {
+		switch {
+		case errors.Is(err, applicationprofile.ErrOnboardingIncomplete):
 			writeError(w, r, http.StatusUnprocessableEntity, "ONBOARDING_INCOMPLETE", "add a bio and at least one photo before completing onboarding")
-			return
+		case errors.Is(err, domainprofile.ErrIncompleteCoordinates):
+			writeError(w, r, http.StatusBadRequest, "INCOMPLETE_COORDINATES", "latitude and longitude must be provided together and be within range")
+		case errors.Is(err, domainprofile.ErrConflictingLocation):
+			writeError(w, r, http.StatusBadRequest, "CONFLICTING_LOCATION", "coordinates and clear_location cannot be combined")
+		default:
+			writeError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "could not update profile")
 		}
-		writeError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "could not update profile")
 		return
 	}
 	writeJSON(w, http.StatusOK, profileResponse(*updated))

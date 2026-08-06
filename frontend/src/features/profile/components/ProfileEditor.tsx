@@ -2,10 +2,12 @@ import { motion } from "framer-motion"
 import { useState } from "react"
 
 import { useLogout } from "@/features/auth/hooks/use-auth"
+import { LocationField, type LocationIntent } from "@/features/profile/components/LocationField"
 import { PhotoGrid } from "@/features/profile/components/PhotoGrid"
 import { PreferencesSection } from "@/features/profile/components/PreferencesSection"
 import { usePhotosQuery, useProfileQuery, useUpdateProfileMutation } from "@/features/profile/hooks/use-profile"
 import type { Profile } from "@/features/profile/types"
+import type { UpdateProfileInput } from "@/features/profile/api/profile-api"
 import { textInputClass } from "@/shared/components/ui/styles"
 import { ApiError } from "@/shared/lib/errors"
 
@@ -34,8 +36,10 @@ function ProfileEditorForm({ profile, photoCount }: { profile: Profile | null | 
   const [city, setCity] = useState(profile?.city ?? "")
   const [interests, setInterests] = useState<string[]>(profile?.interests ?? [])
   const [interestInput, setInterestInput] = useState("")
+  const [locationIntent, setLocationIntent] = useState<LocationIntent>({ kind: "unchanged" })
 
   const onboardingCompleted = profile?.onboarding_completed ?? false
+  const hasStoredLocation = profile?.has_location ?? false
   const stepsDone = [bio.trim().length > 0, photoCount > 0, interests.length > 0].filter(Boolean).length
 
   const addInterest = () => {
@@ -47,7 +51,18 @@ function ProfileEditorForm({ profile, photoCount }: { profile: Profile | null | 
   }
 
   const save = (markComplete: boolean) => {
-    updateProfile.mutate({ bio, city, interests, onboarding_completed: markComplete })
+    const payload: UpdateProfileInput = { bio, city, interests, onboarding_completed: markComplete }
+    if (locationIntent.kind === "captured") {
+      payload.latitude = locationIntent.latitude
+      payload.longitude = locationIntent.longitude
+    } else if (locationIntent.kind === "cleared") {
+      payload.clear_location = true
+    }
+    // "unchanged" sends no location field at all, so the stored coordinates
+    // survive an edit that only touches the bio.
+    updateProfile.mutate(payload, {
+      onSuccess: () => setLocationIntent({ kind: "unchanged" }),
+    })
   }
 
   return (
@@ -129,6 +144,11 @@ function ProfileEditorForm({ profile, photoCount }: { profile: Profile | null | 
             className={`${textInputClass} mt-2`}
           />
         </div>
+        <LocationField
+          hasStoredLocation={hasStoredLocation}
+          intent={locationIntent}
+          onChange={setLocationIntent}
+        />
       </section>
 
       <PreferencesSection />
@@ -159,8 +179,15 @@ function ProfileEditorForm({ profile, photoCount }: { profile: Profile | null | 
 
 function profileErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.code === "ONBOARDING_INCOMPLETE") return "Añade una bio y al menos una foto antes de finalizar tu perfil."
-    return error.message
+    switch (error.code) {
+      case "ONBOARDING_INCOMPLETE":
+        return "Añade una bio y al menos una foto antes de finalizar tu perfil."
+      case "INCOMPLETE_COORDINATES":
+      case "CONFLICTING_LOCATION":
+        return "No se pudo guardar la ubicación. Vuelve a intentarlo."
+      default:
+        return error.message
+    }
   }
   return "No se pudieron guardar los cambios."
 }

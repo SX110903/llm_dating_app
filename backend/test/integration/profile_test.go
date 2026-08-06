@@ -170,6 +170,105 @@ func TestPhotoLifecycleKeepsExactlyOnePrimaryPhoto(t *testing.T) {
 	require.True(t, photos[0].IsPrimary, "the remaining photo must have been promoted to primary")
 }
 
+// TestProfileLocationSurvivesAnUpdateWithoutCoordinates exercises the real
+// PostGIS-backed upsert: the bug it guards against wiped profiles.location on
+// every save from the UI, which would have made every profile invisible to
+// the distance filter.
+func TestProfileLocationSurvivesAnUpdateWithoutCoordinates(t *testing.T) {
+	pool := startPostgres(t)
+	redisClient := startRedis(t)
+	server := newTestServer(t, pool, redisClient, false, []string{"http://localhost:5173"})
+
+	email := uniqueEmail()
+	registerUser(t, server, email, testPassword)
+	accessToken := loginAccessToken(t, server, email, testPassword)
+
+	withLocation := authedJSONRequest(t, server, http.MethodPut, "/api/v1/profile", accessToken, map[string]any{
+		"bio": "con ubicación", "latitude": 40.4168, "longitude": -3.7038, "onboarding_completed": false,
+	})
+	defer func() { _ = withLocation.Body.Close() }()
+	require.Equal(t, http.StatusOK, withLocation.StatusCode)
+	var stored struct {
+		HasLocation bool `json:"has_location"`
+	}
+	require.NoError(t, json.NewDecoder(withLocation.Body).Decode(&stored))
+	require.True(t, stored.HasLocation)
+
+	// Exactly what the profile editor sends when only the bio changes.
+	withoutLocation := authedJSONRequest(t, server, http.MethodPut, "/api/v1/profile", accessToken, map[string]any{
+		"bio": "bio editada", "onboarding_completed": false,
+	})
+	defer func() { _ = withoutLocation.Body.Close() }()
+	require.Equal(t, http.StatusOK, withoutLocation.StatusCode)
+	var preserved struct {
+		Bio         string `json:"bio"`
+		HasLocation bool   `json:"has_location"`
+	}
+	require.NoError(t, json.NewDecoder(withoutLocation.Body).Decode(&preserved))
+	require.Equal(t, "bio editada", preserved.Bio)
+	require.True(t, preserved.HasLocation, "a profile update without coordinates must not erase the stored location")
+
+	// The coordinates really are queryable by PostGIS, not just a non-null blob.
+	var withinMadrid bool
+	require.NoError(t, pool.QueryRow(context.Background(),
+		`SELECT ST_DWithin(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, 1000)
+		 FROM profiles WHERE user_id = (SELECT id FROM users WHERE email = $3)`,
+		-3.7038, 40.4168, email,
+	).Scan(&withinMadrid))
+	require.True(t, withinMadrid, "the stored point must be usable by the PostGIS distance filter")
+}
+
+// TestProfileLocationCanBeClearedExplicitly proves the only supported way to
+// remove a location is the explicit flag.
+func TestProfileLocationCanBeClearedExplicitly(t *testing.T) {
+	pool := startPostgres(t)
+	redisClient := startRedis(t)
+	server := newTestServer(t, pool, redisClient, false, []string{"http://localhost:5173"})
+
+	email := uniqueEmail()
+	registerUser(t, server, email, testPassword)
+	accessToken := loginAccessToken(t, server, email, testPassword)
+
+	set := authedJSONRequest(t, server, http.MethodPut, "/api/v1/profile", accessToken, map[string]any{
+		"bio": "con ubicación", "latitude": 41.3874, "longitude": 2.1686, "onboarding_completed": false,
+	})
+	_ = set.Body.Close()
+	require.Equal(t, http.StatusOK, set.StatusCode)
+
+	cleared := authedJSONRequest(t, server, http.MethodPut, "/api/v1/profile", accessToken, map[string]any{
+		"bio": "sin ubicación", "clear_location": true, "onboarding_completed": false,
+	})
+	defer func() { _ = cleared.Body.Close() }()
+	require.Equal(t, http.StatusOK, cleared.StatusCode)
+	var body struct {
+		HasLocation bool `json:"has_location"`
+	}
+	require.NoError(t, json.NewDecoder(cleared.Body).Decode(&body))
+	require.False(t, body.HasLocation)
+}
+
+func TestProfileRejectsHalfCoordinates(t *testing.T) {
+	pool := startPostgres(t)
+	redisClient := startRedis(t)
+	server := newTestServer(t, pool, redisClient, false, []string{"http://localhost:5173"})
+
+	email := uniqueEmail()
+	registerUser(t, server, email, testPassword)
+	accessToken := loginAccessToken(t, server, email, testPassword)
+
+	resp := authedJSONRequest(t, server, http.MethodPut, "/api/v1/profile", accessToken, map[string]any{
+		"bio": "solo latitud", "latitude": 40.4168, "onboarding_completed": false,
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var body struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Equal(t, "INCOMPLETE_COORDINATES", body.Code)
+}
+
 // TestGenderPreferenceConsentGatesAndWithdrawalClearsValue is the mandatory
 // RGPD consent test: saving genders without consent fails, saving it after
 // granting consent succeeds, and withdrawing consent transactionally clears

@@ -12,7 +12,13 @@ ON CONFLICT (user_id) DO UPDATE SET
     bio = EXCLUDED.bio,
     interests = EXCLUDED.interests,
     city = EXCLUDED.city,
-    location = EXCLUDED.location,
+    -- An update that carries no coordinates must preserve the stored ones;
+    -- only an explicit clear_location drops them.
+    location = CASE
+        WHEN sqlc.arg(clear_location)::boolean THEN NULL
+        WHEN EXCLUDED.location IS NULL THEN profiles.location
+        ELSE EXCLUDED.location
+    END,
     questionnaire = EXCLUDED.questionnaire,
     onboarding_completed = EXCLUDED.onboarding_completed,
     updated_at = now();

@@ -19,11 +19,16 @@ var (
 )
 
 type UpdateProfileInput struct {
-	Bio                 string
-	Interests           []string
-	City                string
+	Bio       string
+	Interests []string
+	City      string
+	// Latitude/Longitude must both be set or both be nil. Leaving them nil
+	// preserves whatever is stored; ClearLocation is the only way to remove
+	// it, so a caller that simply does not know the coordinates can never
+	// erase them by accident.
 	Latitude            *float64
 	Longitude           *float64
+	ClearLocation       bool
 	Questionnaire       map[string]any
 	OnboardingCompleted bool
 }
@@ -67,6 +72,13 @@ func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*domainprof
 }
 
 func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, in UpdateProfileInput) (*domainprofile.Profile, error) {
+	if err := validateLocationIntent(in); err != nil {
+		return nil, err
+	}
+
+	// Onboarding deliberately does not require a location: forcing a browser
+	// geolocation grant to finish signing up is hostile and denial is common.
+	// A profile without coordinates simply stays out of discovery.
 	if in.OnboardingCompleted {
 		photoCount, err := s.profiles.CountActivePhotos(ctx, userID)
 		if err != nil {
@@ -82,6 +94,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, in Update
 		Bio:                 in.Bio,
 		Interests:           in.Interests,
 		City:                in.City,
+		ClearLocation:       in.ClearLocation,
 		Questionnaire:       in.Questionnaire,
 		OnboardingCompleted: in.OnboardingCompleted,
 	}
@@ -92,6 +105,22 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, in Update
 		return nil, fmt.Errorf("upsert profile: %w", err)
 	}
 	return s.profiles.GetProfile(ctx, userID)
+}
+
+func validateLocationIntent(in UpdateProfileInput) error {
+	if (in.Latitude == nil) != (in.Longitude == nil) {
+		return domainprofile.ErrIncompleteCoordinates
+	}
+	if in.ClearLocation && in.Latitude != nil {
+		return domainprofile.ErrConflictingLocation
+	}
+	if in.Latitude != nil && (*in.Latitude < -90 || *in.Latitude > 90) {
+		return domainprofile.ErrIncompleteCoordinates
+	}
+	if in.Longitude != nil && (*in.Longitude < -180 || *in.Longitude > 180) {
+		return domainprofile.ErrIncompleteCoordinates
+	}
+	return nil
 }
 
 func (s *Service) GetPreferences(ctx context.Context, userID uuid.UUID) (*domainprofile.Preferences, error) {

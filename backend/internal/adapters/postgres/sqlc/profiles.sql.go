@@ -300,7 +300,13 @@ ON CONFLICT (user_id) DO UPDATE SET
     bio = EXCLUDED.bio,
     interests = EXCLUDED.interests,
     city = EXCLUDED.city,
-    location = EXCLUDED.location,
+    -- An update that carries no coordinates must preserve the stored ones;
+    -- only an explicit clear_location drops them.
+    location = CASE
+        WHEN $9::boolean THEN NULL
+        WHEN EXCLUDED.location IS NULL THEN profiles.location
+        ELSE EXCLUDED.location
+    END,
     questionnaire = EXCLUDED.questionnaire,
     onboarding_completed = EXCLUDED.onboarding_completed,
     updated_at = now()
@@ -315,6 +321,7 @@ type UpsertProfileParams struct {
 	Latitude            pgtype.Float8 `json:"latitude"`
 	Questionnaire       []byte        `json:"questionnaire"`
 	OnboardingCompleted bool          `json:"onboarding_completed"`
+	ClearLocation       bool          `json:"clear_location"`
 }
 
 func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) error {
@@ -327,6 +334,7 @@ func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) er
 		arg.Latitude,
 		arg.Questionnaire,
 		arg.OnboardingCompleted,
+		arg.ClearLocation,
 	)
 	return err
 }

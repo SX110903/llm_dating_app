@@ -43,8 +43,21 @@ func (r *fakeProfileRepo) GetProfile(_ context.Context, userID uuid.UUID) (*doma
 	return &copied, nil
 }
 
+// UpsertProfile mirrors the location semantics of the real SQL: an explicit
+// clear drops the coordinates, new coordinates replace them, and a write that
+// carries neither leaves whatever was stored untouched.
 func (r *fakeProfileRepo) UpsertProfile(_ context.Context, p *domainprofile.Profile) error {
 	copied := *p
+	switch {
+	case p.ClearLocation:
+		copied.HasLocation = false
+	case p.Location != nil:
+		copied.HasLocation = true
+	default:
+		if existing, ok := r.profiles[p.UserID]; ok {
+			copied.HasLocation = existing.HasLocation
+		}
+	}
 	r.profiles[p.UserID] = &copied
 	return nil
 }
@@ -296,6 +309,105 @@ func TestUpdateProfileRequiresBioAndPhotoToCompleteOnboarding(t *testing.T) {
 		Bio: "", OnboardingCompleted: true,
 	})
 	require.ErrorIs(t, err, applicationprofile.ErrOnboardingIncomplete)
+}
+
+// --- location intent ------------------------------------------------------
+
+func coord(value float64) *float64 { return &value }
+
+// TestUpdateProfileWithoutCoordinatesPreservesStoredLocation is the
+// regression test for the bug that made every profile undiscoverable: saving
+// the profile from the UI carried no coordinates and wiped the stored ones.
+func TestUpdateProfileWithoutCoordinatesPreservesStoredLocation(t *testing.T) {
+	repo := newFakeProfileRepo()
+	svc := newService(repo, newFakeStorage(), fakeConsentChecker{})
+	userID := uuid.New()
+
+	stored, err := svc.UpdateProfile(context.Background(), userID, applicationprofile.UpdateProfileInput{
+		Bio: "con ubicación", Latitude: coord(40.4168), Longitude: coord(-3.7038),
+	})
+	require.NoError(t, err)
+	require.True(t, stored.HasLocation)
+
+	// A later save that only edits the bio must not erase the location.
+	updated, err := svc.UpdateProfile(context.Background(), userID, applicationprofile.UpdateProfileInput{
+		Bio: "bio editada sin tocar la ubicación",
+	})
+	require.NoError(t, err)
+	require.True(t, updated.HasLocation, "omitting coordinates must preserve the stored location")
+}
+
+func TestUpdateProfileClearLocationRemovesIt(t *testing.T) {
+	repo := newFakeProfileRepo()
+	svc := newService(repo, newFakeStorage(), fakeConsentChecker{})
+	userID := uuid.New()
+
+	_, err := svc.UpdateProfile(context.Background(), userID, applicationprofile.UpdateProfileInput{
+		Bio: "con ubicación", Latitude: coord(40.4168), Longitude: coord(-3.7038),
+	})
+	require.NoError(t, err)
+
+	cleared, err := svc.UpdateProfile(context.Background(), userID, applicationprofile.UpdateProfileInput{
+		Bio: "sin ubicación", ClearLocation: true,
+	})
+	require.NoError(t, err)
+	require.False(t, cleared.HasLocation)
+}
+
+func TestUpdateProfileRejectsHalfCoordinates(t *testing.T) {
+	repo := newFakeProfileRepo()
+	svc := newService(repo, newFakeStorage(), fakeConsentChecker{})
+
+	_, err := svc.UpdateProfile(context.Background(), uuid.New(), applicationprofile.UpdateProfileInput{
+		Bio: "solo latitud", Latitude: coord(40.4168),
+	})
+	require.ErrorIs(t, err, domainprofile.ErrIncompleteCoordinates)
+
+	_, err = svc.UpdateProfile(context.Background(), uuid.New(), applicationprofile.UpdateProfileInput{
+		Bio: "solo longitud", Longitude: coord(-3.7038),
+	})
+	require.ErrorIs(t, err, domainprofile.ErrIncompleteCoordinates)
+}
+
+func TestUpdateProfileRejectsOutOfRangeCoordinates(t *testing.T) {
+	repo := newFakeProfileRepo()
+	svc := newService(repo, newFakeStorage(), fakeConsentChecker{})
+
+	_, err := svc.UpdateProfile(context.Background(), uuid.New(), applicationprofile.UpdateProfileInput{
+		Bio: "latitud imposible", Latitude: coord(91), Longitude: coord(0),
+	})
+	require.ErrorIs(t, err, domainprofile.ErrIncompleteCoordinates)
+}
+
+func TestUpdateProfileRejectsCoordinatesCombinedWithClear(t *testing.T) {
+	repo := newFakeProfileRepo()
+	svc := newService(repo, newFakeStorage(), fakeConsentChecker{})
+
+	_, err := svc.UpdateProfile(context.Background(), uuid.New(), applicationprofile.UpdateProfileInput{
+		Bio: "contradictorio", Latitude: coord(40.4168), Longitude: coord(-3.7038), ClearLocation: true,
+	})
+	require.ErrorIs(t, err, domainprofile.ErrConflictingLocation)
+}
+
+// TestUpdateProfileCompletesOnboardingWithoutLocation pins the deliberate
+// decision that a location is not required to finish onboarding.
+func TestUpdateProfileCompletesOnboardingWithoutLocation(t *testing.T) {
+	repo := newFakeProfileRepo()
+	store := newFakeStorage()
+	svc := newService(repo, store, fakeConsentChecker{})
+	userID := uuid.New()
+
+	_, err := svc.CreatePhoto(context.Background(), userID, applicationprofile.NewPhotoInput{
+		MimeType: "image/png", Width: 10, Height: 10, ByteSize: 1, Data: []byte("x"),
+	})
+	require.NoError(t, err)
+
+	updated, err := svc.UpdateProfile(context.Background(), userID, applicationprofile.UpdateProfileInput{
+		Bio: "sin ubicación pero completo", OnboardingCompleted: true,
+	})
+	require.NoError(t, err)
+	require.True(t, updated.OnboardingCompleted)
+	require.False(t, updated.HasLocation)
 }
 
 func TestCreatePhotoAssignsFirstPhotoAsPrimary(t *testing.T) {

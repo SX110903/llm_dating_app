@@ -13,4 +13,9 @@ var (
 	ErrConsentRequired     = errors.New("explicit consent is required before saving this preference")
 	ErrInvalidAgeRange     = errors.New("invalid age range preference")
 	ErrInvalidDistance     = errors.New("invalid max distance preference")
+	// ErrIncompleteCoordinates guards against a half-applied location: a
+	// latitude without its longitude (or the reverse) is rejected instead of
+	// being silently dropped.
+	ErrIncompleteCoordinates = errors.New("latitude and longitude must be provided together")
+	ErrConflictingLocation   = errors.New("coordinates and clear location cannot be combined")
 )
