@@ -15,7 +15,10 @@ services:
       - ./backend/migrations/bootstrap:/docker-entrypoint-initdb.d:ro
     networks: [data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      # Probe over TCP, not the local socket: the socket accepts connections
+      # before the network listener does, which let dependent services start
+      # too early and fail to connect on a cold boot.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20
