@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -34,10 +35,9 @@ type RateLimiter interface {
 // MessageEvent is the payload replicated across instances. It carries no
 // tokens and no ticket, only what a participant is already allowed to read.
 type MessageEvent struct {
-	MatchID     uuid.UUID               `json:"match_id"`
-	Recipients  []uuid.UUID             `json:"recipients"`
-	Message     domainmessaging.Message `json:"-"`
-	MessageJSON MessagePayload          `json:"message"`
+	MatchID    uuid.UUID      `json:"match_id"`
+	Recipients []uuid.UUID    `json:"recipients"`
+	Message    MessagePayload `json:"message"`
 }
 
 type MessagePayload struct {

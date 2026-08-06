@@ -36,14 +36,20 @@ type Config struct {
 	TicketTTL time.Duration
 }
 
-type SendInput struct {
+// SendTextInput carries a plain-text message. Media never travels this way:
+// it has its own entry point so a storage key can never be client-supplied.
+type SendTextInput struct {
 	MatchID     uuid.UUID
 	SenderID    uuid.UUID
 	ClientNonce uuid.UUID
-	Type        domainmessaging.MessageType
 	Content     string
-	StorageKey  string
 }
+
+// Media messages are intentionally not sendable yet. The schema already
+// models them, but a safe upload path needs a stored MIME type, size limits
+// and moderation, none of which this phase defines. Accepting a
+// client-supplied storage key instead would let a sender point a message at
+// an object it does not own, so the API rejects those types outright.
 
 type HistoryPage struct {
 	Messages   []domainmessaging.Message
@@ -87,36 +93,59 @@ func (s *Service) Authorize(ctx context.Context, matchID, viewerID uuid.UUID) (*
 	return s.messages.GetActiveParticipants(ctx, matchID, viewerID)
 }
 
-// Send persists the message and only then publishes it. If persistence fails
-// nothing is broadcast, so a client can never see a message that does not
-// exist. A replayed nonce returns the stored row without republishing.
-func (s *Service) Send(ctx context.Context, in SendInput) (*domainmessaging.SendResult, error) {
-	if err := validateSend(in); err != nil {
-		return nil, err
+// SendText persists a text message and only then publishes it. If persistence
+// fails nothing is broadcast, so a client can never see a message that does
+// not exist. A replayed nonce returns the stored row without republishing.
+func (s *Service) SendText(ctx context.Context, in SendTextInput) (*domainmessaging.SendResult, error) {
+	if in.ClientNonce == uuid.Nil {
+		return nil, domainmessaging.ErrInvalidNonce
+	}
+	content := strings.TrimSpace(in.Content)
+	if content == "" {
+		return nil, domainmessaging.ErrEmptyContent
+	}
+	if len([]rune(content)) > domainmessaging.MaxContentLength {
+		return nil, domainmessaging.ErrContentTooLong
 	}
 
-	participants, err := s.messages.GetActiveParticipants(ctx, in.MatchID, in.SenderID)
+	participants, err := s.admit(ctx, in.MatchID, in.SenderID)
 	if err != nil {
 		return nil, err
 	}
 
-	allowed, retryAfter, err := s.rateLimiter.Allow(ctx, in.SenderID)
+	return s.persistAndPublish(ctx, participants, &domainmessaging.Message{
+		ID:          uuid.New(),
+		MatchID:     in.MatchID,
+		SenderID:    in.SenderID,
+		ClientNonce: in.ClientNonce,
+		Type:        domainmessaging.MessageText,
+		Content:     content,
+	})
+}
+
+// admit runs the two gates every send shares: match membership and rate limit.
+func (s *Service) admit(ctx context.Context, matchID, senderID uuid.UUID) (*domainmessaging.Participants, error) {
+	participants, err := s.messages.GetActiveParticipants(ctx, matchID, senderID)
+	if err != nil {
+		return nil, err
+	}
+	allowed, retryAfter, err := s.rateLimiter.Allow(ctx, senderID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", domainmessaging.ErrDependencyUnavailable, err)
 	}
 	if !allowed {
 		return nil, &RateLimitedError{RetryAfter: retryAfter}
 	}
+	return participants, nil
+}
 
-	message := &domainmessaging.Message{
-		ID:          uuid.New(),
-		MatchID:     in.MatchID,
-		SenderID:    in.SenderID,
-		ClientNonce: in.ClientNonce,
-		Type:        in.Type,
-		Content:     in.Content,
-		StorageKey:  in.StorageKey,
-	}
+// persistAndPublish enforces the ordering the plan requires: durable first,
+// broadcast second.
+func (s *Service) persistAndPublish(
+	ctx context.Context,
+	participants *domainmessaging.Participants,
+	message *domainmessaging.Message,
+) (*domainmessaging.SendResult, error) {
 	result, err := s.messages.Send(ctx, message)
 	if err != nil {
 		return nil, fmt.Errorf("persist message: %w", err)
@@ -126,17 +155,14 @@ func (s *Service) Send(ctx context.Context, in SendInput) (*domainmessaging.Send
 	// already have it, so only a genuine insert is fanned out.
 	if result.Created {
 		event := MessageEvent{
-			MatchID:     in.MatchID,
-			Recipients:  []uuid.UUID{participants.UserLowID, participants.UserHighID},
-			Message:     result.Message,
-			MessageJSON: NewMessagePayload(result.Message),
+			MatchID:    message.MatchID,
+			Recipients: []uuid.UUID{participants.UserLowID, participants.UserHighID},
+			Message:    NewMessagePayload(result.Message),
 		}
-		if publishErr := s.publisher.Publish(ctx, event); publishErr != nil {
-			// The message is already durable, so the send succeeded. Losing the
-			// fan-out only costs live delivery, which the client recovers over
-			// HTTP from its last cursor.
-			return result, nil //nolint:nilerr // persistence is the contract; live delivery is best-effort
-		}
+		// The message is already durable, so the send succeeded. Losing the
+		// fan-out only costs live delivery, which the client recovers over HTTP
+		// from its last cursor.
+		_ = s.publisher.Publish(ctx, event)
 	}
 	return result, nil
 }
@@ -151,7 +177,7 @@ func (s *Service) History(ctx context.Context, matchID, viewerID uuid.UUID, curs
 		return nil, err
 	}
 
-	params := domainmessaging.HistoryParams{MatchID: matchID, ViewerID: viewerID, Limit: size + 1}
+	params := domainmessaging.HistoryParams{MatchID: matchID, Limit: size + 1}
 	if cursor != "" {
 		decoded, decodeErr := decodeCursor(cursor)
 		if decodeErr != nil {
@@ -221,34 +247,6 @@ func (s *Service) ConsumeTicket(ctx context.Context, ticket string) (uuid.UUID, 
 		return uuid.Nil, err
 	}
 	return userID, nil
-}
-
-func validateSend(in SendInput) error {
-	if !in.Type.IsValid() {
-		return domainmessaging.ErrInvalidMessageType
-	}
-	if in.ClientNonce == uuid.Nil {
-		return domainmessaging.ErrInvalidNonce
-	}
-	if in.Type == domainmessaging.MessageText {
-		if strings.TrimSpace(in.Content) == "" {
-			return domainmessaging.ErrEmptyContent
-		}
-		if len([]rune(in.Content)) > domainmessaging.MaxContentLength {
-			return domainmessaging.ErrContentTooLong
-		}
-		if in.StorageKey != "" {
-			return domainmessaging.ErrInvalidMessageType
-		}
-		return nil
-	}
-	if in.StorageKey == "" {
-		return domainmessaging.ErrMediaKeyRequired
-	}
-	if in.Content != "" {
-		return domainmessaging.ErrInvalidMessageType
-	}
-	return nil
 }
 
 func normalizePageSize(limit int) (int, error) {

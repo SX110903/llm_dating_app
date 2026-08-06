@@ -18,10 +18,6 @@ const (
 	MessageGIF   MessageType = "gif"
 )
 
-func (t MessageType) IsValid() bool {
-	return t == MessageText || t == MessageImage || t == MessageGIF
-}
-
 func (t MessageType) IsMedia() bool {
 	return t == MessageImage || t == MessageGIF
 }
@@ -52,9 +48,8 @@ type Cursor struct {
 }
 
 type HistoryParams struct {
-	MatchID  uuid.UUID
-	ViewerID uuid.UUID
-	Limit    int
+	MatchID uuid.UUID
+	Limit   int
 	// Before pages backwards through history, oldest-ward from the cursor.
 	Before *Cursor
 }

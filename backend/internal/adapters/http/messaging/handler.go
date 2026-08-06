@@ -117,13 +117,11 @@ func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The sender always comes from the authenticated identity, never the body.
-	result, err := h.service.Send(r.Context(), applicationmessaging.SendInput{
+	result, err := h.service.SendText(r.Context(), applicationmessaging.SendTextInput{
 		MatchID:     matchID,
 		SenderID:    identity.UserID,
 		ClientNonce: nonce,
-		Type:        domainmessaging.MessageType(req.Type),
 		Content:     h.sanitize(req.Content),
-		StorageKey:  strings.TrimSpace(req.StorageKey),
 	})
 	if err != nil {
 		writeServiceError(w, r, err)
@@ -237,8 +235,6 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, r, http.StatusUnprocessableEntity, "CONTENT_TOO_LONG", "message is too long")
 	case errors.Is(err, domainmessaging.ErrEmptyContent):
 		writeError(w, r, http.StatusUnprocessableEntity, "EMPTY_CONTENT", "text messages require content")
-	case errors.Is(err, domainmessaging.ErrMediaKeyRequired):
-		writeError(w, r, http.StatusUnprocessableEntity, "STORAGE_KEY_REQUIRED", "media messages require a storage key")
 	case errors.Is(err, domainmessaging.ErrInvalidMessageType), errors.Is(err, domainmessaging.ErrInvalidNonce):
 		writeError(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "message payload is not coherent")
 	default:

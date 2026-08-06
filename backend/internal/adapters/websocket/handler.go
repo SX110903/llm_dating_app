@@ -143,7 +143,7 @@ func (h *Handler) handleClientEvent(ctx context.Context, client *Client, event C
 // Broadcast is the entry point used by the Redis subscriber to fan an event
 // out to the sockets this instance owns.
 func (h *Handler) Broadcast(event applicationmessaging.MessageEvent) {
-	payload := event.MessageJSON
+	payload := event.Message
 	matchID := event.MatchID
 	h.hub.Deliver(event.Recipients, ServerEvent{
 		Type: EventMessage, Message: &payload, MatchID: &matchID, SentAt: time.Now().UTC(),

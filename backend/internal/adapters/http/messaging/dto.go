@@ -1,10 +1,12 @@
 package messaging
 
+// SendMessageRequest deliberately has no storage key: object keys are always
+// generated server-side, never accepted from a client. Only text is sendable
+// in this phase, so "type" is constrained accordingly.
 type SendMessageRequest struct {
 	ClientNonce string `json:"client_nonce" validate:"required,uuid4"`
-	Type        string `json:"type" validate:"required,oneof=text image gif"`
-	Content     string `json:"content" validate:"max=2000"`
-	StorageKey  string `json:"storage_key" validate:"max=512"`
+	Type        string `json:"type" validate:"required,oneof=text"`
+	Content     string `json:"content" validate:"required,max=2000"`
 }
 
 type MessageResponse struct {

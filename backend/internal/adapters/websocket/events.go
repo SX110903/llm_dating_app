@@ -18,7 +18,6 @@ const (
 	EventMessage ServerEventType = "message"
 	EventTyping  ServerEventType = "typing"
 	EventClosed  ServerEventType = "conversation_closed"
-	EventError   ServerEventType = "error"
 	EventReady   ServerEventType = "ready"
 )
 
@@ -28,7 +27,6 @@ type ServerEvent struct {
 	Message *applicationmessaging.MessagePayload `json:"message,omitempty"`
 	MatchID *uuid.UUID                           `json:"match_id,omitempty"`
 	UserID  *uuid.UUID                           `json:"user_id,omitempty"`
-	Code    string                               `json:"code,omitempty"`
 	SentAt  time.Time                            `json:"sent_at"`
 }
 
