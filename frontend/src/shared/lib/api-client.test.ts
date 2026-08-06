@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { apiFetch } from "@/shared/lib/api-client"
+import { apiFetch, apiFetchBlob } from "@/shared/lib/api-client"
 import { ApiError } from "@/shared/lib/errors"
 import { useAuthStore } from "@/shared/state/auth-store"
 
@@ -94,5 +94,23 @@ describe("apiFetch", () => {
       code: "INVALID_CREDENTIALS",
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("downloads protected image content with the current bearer token", async () => {
+    useAuthStore.getState().setSession({
+      accessToken: "image-token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00Z",
+      user,
+    })
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer image-token")
+      return new Response("image-bytes", { status: 200, headers: { "Content-Type": "image/png" } })
+    })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const blob = await apiFetchBlob("/matching/photos/photo-id/content")
+
+    expect(blob.type).toBe("image/png")
+    expect(await blob.text()).toBe("image-bytes")
   })
 })

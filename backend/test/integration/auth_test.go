@@ -79,6 +79,17 @@ func testKeyPair(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 // Postgres and Redis so integration tests exercise the actual adapters, not
 // doubles.
 func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Client, production bool, allowedOrigins []string) *httptest.Server {
+	return newTestServerWithMatchingLimit(t, pool, redisClient, production, allowedOrigins, 100)
+}
+
+func newTestServerWithMatchingLimit(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	redisClient *redisclient.Client,
+	production bool,
+	allowedOrigins []string,
+	dailySwipeLimit int,
+) *httptest.Server {
 	t.Helper()
 	privateKey, publicKey := testKeyPair(t)
 	tokenIssuer := platformcrypto.NewTokenIssuer(privateKey, publicKey, "llmatch-v2-test", "llmatch-v2-test-clients", 15*time.Minute)
@@ -108,7 +119,7 @@ func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Cl
 		redisadapter.NewSwipeLimiter(redisClient),
 		photoStorage,
 		applicationmatching.Config{
-			DailySwipeLimit: 100,
+			DailySwipeLimit: dailySwipeLimit,
 			RankingWeights: domainmatching.RankingWeights{
 				Interests: 0.35, Questionnaire: 0.30, Distance: 0.20, Activity: 0.15,
 			},
@@ -133,13 +144,21 @@ func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Cl
 }
 
 func registerUser(t *testing.T, server *httptest.Server, email, password string) {
+	registerUserWithDetails(t, server, email, password, "Test User", "woman")
+}
+
+func registerUserWithDetails(
+	t *testing.T,
+	server *httptest.Server,
+	email, password, displayName, gender string,
+) {
 	t.Helper()
 	body, err := json.Marshal(map[string]string{
 		"email":        email,
 		"password":     password,
-		"display_name": "Test User",
+		"display_name": displayName,
 		"birth_date":   "1995-06-15",
-		"gender":       "woman",
+		"gender":       gender,
 	})
 	require.NoError(t, err)
 
