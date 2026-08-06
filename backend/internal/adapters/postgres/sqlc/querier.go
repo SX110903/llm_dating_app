@@ -21,7 +21,12 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	EnsureDiscoveryReady(ctx context.Context, userID pgtype.UUID) (bool, error)
 	FindActiveConsent(ctx context.Context, arg FindActiveConsentParams) (PrivacyConsent, error)
+	// Authorization in a single statement: the match must exist, still be active,
+	// include the viewer, and carry no block in either direction. Anything else
+	// returns no row, so the caller cannot tell the cases apart.
+	GetActiveParticipants(ctx context.Context, arg GetActiveParticipantsParams) (GetActiveParticipantsRow, error)
 	GetMatchByPair(ctx context.Context, arg GetMatchByPairParams) (Match, error)
+	GetMessageByNonce(ctx context.Context, arg GetMessageByNonceParams) (Message, error)
 	GetPhoto(ctx context.Context, id pgtype.UUID) (Photo, error)
 	GetPreferences(ctx context.Context, userID pgtype.UUID) (UserPreference, error)
 	GetProfile(ctx context.Context, userID pgtype.UUID) (GetProfileRow, error)
@@ -35,13 +40,23 @@ type Querier interface {
 	HasPositiveReverseSwipe(ctx context.Context, arg HasPositiveReverseSwipeParams) (bool, error)
 	InsertBlock(ctx context.Context, arg InsertBlockParams) error
 	InsertMatch(ctx context.Context, arg InsertMatchParams) (Match, error)
+	// ON CONFLICT DO NOTHING makes a replayed nonce a no-op instead of a
+	// duplicate; an empty result tells the repository to fetch the stored row.
+	InsertMessage(ctx context.Context, arg InsertMessageParams) (Message, error)
 	InsertReport(ctx context.Context, arg InsertReportParams) (Report, error)
 	InsertSwipe(ctx context.Context, arg InsertSwipeParams) (Swipe, error)
 	InteractionBlocked(ctx context.Context, arg InteractionBlockedParams) (bool, error)
 	ListActiveMatches(ctx context.Context, arg ListActiveMatchesParams) ([]ListActiveMatchesRow, error)
+	ListConversations(ctx context.Context, arg ListConversationsParams) ([]ListConversationsRow, error)
 	ListDiscoveryCandidates(ctx context.Context, arg ListDiscoveryCandidatesParams) ([]ListDiscoveryCandidatesRow, error)
+	// Keyset pagination over (created_at, id) so concurrent inserts cannot create
+	// gaps or duplicates while the client pages backwards.
+	ListMessagesBefore(ctx context.Context, arg ListMessagesBeforeParams) ([]Message, error)
 	ListPhotos(ctx context.Context, userID pgtype.UUID) ([]Photo, error)
 	LockInteractionPair(ctx context.Context, arg LockInteractionPairParams) error
+	// Only messages the viewer received are flagged, so a read receipt can never
+	// be forged for one's own messages.
+	MarkMessagesRead(ctx context.Context, arg MarkMessagesReadParams) (int64, error)
 	MatchParticipantExists(ctx context.Context, arg MatchParticipantExistsParams) (bool, error)
 	Ping(ctx context.Context) (int64, error)
 	ReplaceRefreshToken(ctx context.Context, arg ReplaceRefreshTokenParams) error

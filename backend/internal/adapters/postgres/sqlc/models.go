@@ -25,6 +25,19 @@ type Match struct {
 	UnmatchedBy pgtype.UUID        `json:"unmatched_by"`
 }
 
+type Message struct {
+	ID          pgtype.UUID        `json:"id"`
+	MatchID     pgtype.UUID        `json:"match_id"`
+	SenderID    pgtype.UUID        `json:"sender_id"`
+	ClientNonce pgtype.UUID        `json:"client_nonce"`
+	Type        string             `json:"type"`
+	Content     pgtype.Text        `json:"content"`
+	StorageKey  pgtype.Text        `json:"storage_key"`
+	ReadAt      pgtype.Timestamptz `json:"read_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type Photo struct {
 	ID         pgtype.UUID        `json:"id"`
 	UserID     pgtype.UUID        `json:"user_id"`
