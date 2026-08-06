@@ -40,34 +40,53 @@ export function DiscoveryDeck({ onEditProfile, onViewMatches }: DiscoveryDeckPro
     onViewMatches()
   }, [onViewMatches])
 
+  const matchModal = (
+    <AnimatePresence>
+      {matchedCandidate && (
+        <MatchModal candidate={matchedCandidate} onClose={closeMatch} onViewMatches={viewMatches} />
+      )}
+    </AnimatePresence>
+  )
+
   if (discovery.isPending) {
-    return <CardSkeleton />
+    return (
+      <>
+        <CardSkeleton />
+        {matchModal}
+      </>
+    )
   }
 
   if (discovery.isError) {
     const notReady = discovery.error instanceof ApiError && discovery.error.code === "DISCOVERY_NOT_READY"
     return (
-      <EmptyState
-        title={notReady ? "Tu perfil aun no aparece en discovery" : "No se pudo cargar discovery"}
-        description={
-          notReady
-            ? "Revisa tus preferencias, consentimiento, ubicacion y foto principal."
-            : "Comprueba tu conexion y vuelve a intentarlo."
-        }
-        actionLabel={notReady ? "Revisar perfil" : "Reintentar"}
-        onAction={notReady ? onEditProfile : () => void discovery.refetch()}
-      />
+      <>
+        <EmptyState
+          title={notReady ? "Tu perfil aun no aparece en discovery" : "No se pudo cargar discovery"}
+          description={
+            notReady
+              ? "Revisa tus preferencias, consentimiento, ubicacion y foto principal."
+              : "Comprueba tu conexion y vuelve a intentarlo."
+          }
+          actionLabel={notReady ? "Revisar perfil" : "Reintentar"}
+          onAction={notReady ? onEditProfile : () => void discovery.refetch()}
+        />
+        {matchModal}
+      </>
     )
   }
 
   if (!candidate) {
     return (
-      <EmptyState
-        title="Ya has visto todos los perfiles disponibles"
-        description="Vuelve mas tarde o ajusta tus preferencias para descubrir nuevas personas."
-        actionLabel={discovery.hasNextPage ? "Cargar mas" : "Editar preferencias"}
-        onAction={discovery.hasNextPage ? () => void discovery.fetchNextPage() : onEditProfile}
-      />
+      <>
+        <EmptyState
+          title="Ya has visto todos los perfiles disponibles"
+          description="Vuelve mas tarde o ajusta tus preferencias para descubrir nuevas personas."
+          actionLabel={discovery.hasNextPage ? "Cargar mas" : "Editar preferencias"}
+          onAction={discovery.hasNextPage ? () => void discovery.fetchNextPage() : onEditProfile}
+        />
+        {matchModal}
+      </>
     )
   }
 
@@ -97,11 +116,7 @@ export function DiscoveryDeck({ onEditProfile, onViewMatches }: DiscoveryDeckPro
       <p className="mt-4 text-center text-xs text-white/35">Arrastra la tarjeta o usa los botones</p>
       {actionError && <p className="mt-2 text-center text-sm text-rose-300">{actionError}</p>}
 
-      <AnimatePresence>
-        {matchedCandidate && (
-          <MatchModal candidate={matchedCandidate} onClose={closeMatch} onViewMatches={viewMatches} />
-        )}
-      </AnimatePresence>
+      {matchModal}
     </div>
   )
 }
