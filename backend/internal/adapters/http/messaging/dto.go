@@ -8,10 +8,12 @@ type SendMessageRequest struct {
 }
 
 type MessageResponse struct {
-	ID          string  `json:"id"`
-	MatchID     string  `json:"match_id"`
-	SenderID    string  `json:"sender_id"`
-	ClientNonce string  `json:"client_nonce"`
+	ID       string `json:"id"`
+	MatchID  string `json:"match_id"`
+	SenderID string `json:"sender_id"`
+	// Omitted in projections that do not carry it, such as the last message of
+	// a conversation summary, so the contract never reports a fake nonce.
+	ClientNonce string  `json:"client_nonce,omitempty"`
 	Type        string  `json:"type"`
 	Content     string  `json:"content,omitempty"`
 	StorageKey  string  `json:"storage_key,omitempty"`

@@ -248,14 +248,16 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 
 func messageResponse(message domainmessaging.Message) MessageResponse {
 	response := MessageResponse{
-		ID:          message.ID.String(),
-		MatchID:     message.MatchID.String(),
-		SenderID:    message.SenderID.String(),
-		ClientNonce: message.ClientNonce.String(),
-		Type:        string(message.Type),
-		Content:     message.Content,
-		StorageKey:  message.StorageKey,
-		CreatedAt:   message.CreatedAt.Format(time.RFC3339),
+		ID:         message.ID.String(),
+		MatchID:    message.MatchID.String(),
+		SenderID:   message.SenderID.String(),
+		Type:       string(message.Type),
+		Content:    message.Content,
+		StorageKey: message.StorageKey,
+		CreatedAt:  message.CreatedAt.Format(time.RFC3339),
+	}
+	if message.ClientNonce != uuid.Nil {
+		response.ClientNonce = message.ClientNonce.String()
 	}
 	if message.ReadAt != nil {
 		readAt := message.ReadAt.Format(time.RFC3339)
