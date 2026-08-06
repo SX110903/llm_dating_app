@@ -21,6 +21,9 @@ type Client struct {
 
 	writeTimeout time.Duration
 	closeOnce    chan struct{}
+	// disconnect severs the socket when the queue policy decides the consumer
+	// cannot keep up. Injected so that policy is exercisable on its own.
+	disconnect func(reason string)
 }
 
 func newClient(userID uuid.UUID, conn *websocket.Conn, queueSize int, writeTimeout time.Duration, logger zerolog.Logger) *Client {
@@ -31,6 +34,9 @@ func newClient(userID uuid.UUID, conn *websocket.Conn, queueSize int, writeTimeo
 		logger:       logger,
 		writeTimeout: writeTimeout,
 		closeOnce:    make(chan struct{}),
+		disconnect: func(reason string) {
+			_ = conn.Close(websocket.StatusPolicyViolation, reason)
+		},
 	}
 }
 
@@ -52,7 +58,7 @@ func (c *Client) closeSlow() {
 	case <-c.closeOnce:
 	default:
 		close(c.closeOnce)
-		_ = c.conn.Close(websocket.StatusPolicyViolation, "client too slow")
+		c.disconnect("client too slow")
 	}
 }
 
