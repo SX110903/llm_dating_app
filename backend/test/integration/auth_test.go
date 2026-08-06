@@ -21,13 +21,18 @@ import (
 	tcredis "github.com/testcontainers/testcontainers-go/modules/redis"
 
 	httpadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/http"
+	httpaccount "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/account"
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
+	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
 	redisadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/redis"
+	"github.com/sx110903/llmatch-v2/backend/internal/adapters/storage"
+	applicationaccount "github.com/sx110903/llmatch-v2/backend/internal/application/account"
 	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
+	applicationprofile "github.com/sx110903/llmatch-v2/backend/internal/application/profile"
 	platformcrypto "github.com/sx110903/llmatch-v2/backend/internal/platform/crypto"
 	platformmiddleware "github.com/sx110903/llmatch-v2/backend/internal/platform/middleware"
 )
@@ -91,12 +96,19 @@ func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Cl
 	authMiddleware := platformmiddleware.Auth(tokenIssuer, denylist, 300*time.Millisecond)
 	healthService := applicationhealth.NewService(2*time.Second, postgres.Checker{Pool: pool}, redisadapter.Checker{Client: redisClient})
 
+	photoStorage := storage.NewLocalStorage(t.TempDir())
+	consentRepository := repositories.NewConsentRepository(pool)
+	privacyService := applicationaccount.NewPrivacyService(consentRepository)
+	profileService := applicationprofile.NewService(repositories.NewProfileRepository(pool), photoStorage, privacyService)
+
 	router := httpadapter.NewRouter(httpadapter.RouterConfig{
 		Logger:         zerolog.Nop(),
 		AllowedOrigins: allowedOrigins,
 		Production:     production,
 		Health:         httphealth.NewHandler(healthService),
 		Auth:           authHandler,
+		Profile:        httpprofile.NewHandler(profileService),
+		Account:        httpaccount.NewHandler(privacyService),
 		AuthMiddleware: authMiddleware,
 	})
 
