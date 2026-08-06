@@ -5,6 +5,13 @@ services:
       DATABASE_URL: ${PRODUCTION_DATABASE_URL:?PRODUCTION_DATABASE_URL with sslmode=verify-full is required}
       REDIS_URL: ${PRODUCTION_REDIS_URL:?PRODUCTION_REDIS_URL with rediss is required}
       CORS_ALLOWED_ORIGINS: ${PRODUCTION_CORS_ALLOWED_ORIGINS:?PRODUCTION_CORS_ALLOWED_ORIGINS is required}
+      # Photos live in S3 in production; AWS credentials come from the
+      # environment's own credential chain (e.g. an IAM role), not from
+      # this compose file.
+      PHOTO_STORAGE_DRIVER: s3
+      PHOTO_STORAGE_S3_BUCKET: ${PRODUCTION_PHOTO_STORAGE_S3_BUCKET:?PRODUCTION_PHOTO_STORAGE_S3_BUCKET is required}
+      PHOTO_STORAGE_S3_REGION: ${PRODUCTION_PHOTO_STORAGE_S3_REGION:?PRODUCTION_PHOTO_STORAGE_S3_REGION is required}
+    volumes: !reset []
 
   frontend:
     build:

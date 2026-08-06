@@ -7,7 +7,8 @@ RUN go mod download
 COPY backend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/healthcheck ./cmd/healthcheck && \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate && \
+    mkdir -p /photos-seed/photos
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
 
@@ -16,6 +17,10 @@ COPY --from=build --chown=nonroot:nonroot /out/api /app/api
 COPY --from=build --chown=nonroot:nonroot /out/healthcheck /app/healthcheck
 COPY --from=build --chown=nonroot:nonroot /out/migrate /app/migrate
 COPY --from=build --chown=nonroot:nonroot /src/migrations /app/migrations
+# Seeds an empty, nonroot-owned directory so the local photo storage volume
+# (development only; production uses S3) inherits correct ownership on
+# first mount instead of defaulting to root.
+COPY --from=build --chown=nonroot:nonroot /photos-seed/photos /data/photos
 
 USER nonroot:nonroot
 EXPOSE 8080
