@@ -1,10 +1,11 @@
 import { motion, useReducedMotion } from "framer-motion"
-import { Heart, LogOut, User, Users } from "lucide-react"
+import { Heart, LogOut, MessagesSquare, User, Users } from "lucide-react"
 import { useCallback, useState } from "react"
 
 import { AuthPanel } from "@/features/auth/components/AuthPanel"
 import { useLogout } from "@/features/auth/hooks/use-auth"
 import { MatchesList } from "@/features/matches/components/MatchesList"
+import { MessagesScreen } from "@/features/messaging/components/MessagesScreen"
 import { ProfileEditor } from "@/features/profile/components/ProfileEditor"
 import { useProfileQuery } from "@/features/profile/hooks/use-profile"
 import { DiscoveryDeck } from "@/features/swipe/components/DiscoveryDeck"
@@ -58,7 +59,7 @@ function AuthenticatedApp() {
   return <AppShell />
 }
 
-type AppTab = "discovery" | "matches" | "profile"
+type AppTab = "discovery" | "matches" | "messages" | "profile"
 
 function AppShell() {
   const [tab, setTab] = useState<AppTab>("discovery")
@@ -85,6 +86,9 @@ function AppShell() {
           <NavButton active={tab === "matches"} label="Matches" onClick={showMatches}>
             <Users aria-hidden className="h-4 w-4" />
           </NavButton>
+          <NavButton active={tab === "messages"} label="Mensajes" onClick={() => setTab("messages")}>
+            <MessagesSquare aria-hidden className="h-4 w-4" />
+          </NavButton>
           <NavButton active={tab === "profile"} label="Perfil" onClick={showProfile}>
             <User aria-hidden className="h-4 w-4" />
           </NavButton>
@@ -104,6 +108,7 @@ function AppShell() {
       <AnimateTab tab={tab}>
         {tab === "discovery" && <DiscoveryDeck onEditProfile={showProfile} onViewMatches={showMatches} />}
         {tab === "matches" && <MatchesList />}
+        {tab === "messages" && <MessagesScreen />}
         {tab === "profile" && <ProfileEditor />}
       </AnimateTab>
     </div>
