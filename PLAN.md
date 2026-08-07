@@ -1,6 +1,6 @@
 # LLMatch v2 — plan de ejecución
 
-Estado: **aprobado el 5 de agosto de 2026**. Las Fases 0, 1, 2 y 3 están implementadas y validadas. La ejecución queda detenida antes de la Fase 4 hasta recibir una nueva confirmación.
+Estado: **aprobado el 5 de agosto de 2026**, ampliado el 6 de agosto de 2026 con las Fases 9 a 12. Las Fases 0 a 3 están implementadas y validadas. La Fase 4 tiene el backend terminado y probado; le falta la interfaz de chat, ejecutar sus pruebas de integración y su documentación. No se inicia ninguna fase posterior sin cerrar la 4.
 
 ## 1. Alcance y decisiones cerradas
 
@@ -20,6 +20,13 @@ Estado: **aprobado el 5 de agosto de 2026**. Las Fases 0, 1, 2 y 3 están implem
 - Perfiles y mensajes serán texto plano sanitizado. No habrá `dangerouslySetInnerHTML` con datos de usuario.
 - El almacenamiento local será el adaptador de desarrollo; S3 con AWS SDK v2 será el adaptador de producción. La base guardará claves internas de objeto, no URLs aportadas por el cliente.
 - La Fase 6 (LLM real) queda desactivada hasta una confirmación expresa.
+- **Claves de objeto generadas siempre por el backend.** Ningún endpoint acepta una clave de almacenamiento aportada por el cliente: hacerlo permitiría apuntar un registro propio a un objeto ajeno. Toda subida entrega bytes y el servidor decide dónde viven. Por eso la mensajería de la Fase 4 es solo texto: el esquema modela `image`/`gif`, pero no habrá envío de media hasta que exista un camino de subida con MIME persistido, límites de tamaño y moderación.
+- **Ningún dato de tarjeta toca este backend.** Nunca se recibirán, registrarán ni almacenarán números de tarjeta, CVV ni datos de titular. Los cobros usarán checkout alojado del proveedor: el usuario introduce sus datos en el dominio del proveedor y el sistema solo maneja identificadores externos. Las claves de API viven en secretos del backend.
+- **La suscripción la decide el webhook, no el navegador.** El estado de pago se deriva exclusivamente de webhooks firmados y verificados criptográficamente, procesados de forma idempotente por id de evento. Una redirección de vuelta del navegador nunca concede acceso premium.
+- **Los cobros reales no se activan antes de las Fases 7 y 8.** Aceptar dinero de cuentas sin email verificado y sin un camino real de borrado y exportación de datos es un problema legal, no técnico. Hasta cerrar ambas fases, la integración de pagos permanecerá en modo de pruebas del proveedor.
+- **Presupuesto de rendimiento antes que motor 3D.** Cualquier trabajo de animación o 3D se mide antes de escribirse: objetivo de 60 fps en un móvil de gama media y un límite explícito de tamaño de bundle. Se prefieren transformaciones 3D con CSS (`transform`, `perspective`) a un motor WebGL completo; si este resulta imprescindible, se carga de forma diferida y solo en las vistas que lo usan. `prefers-reduced-motion` es obligatorio para toda animación, sin excepción.
+- **Objetivos de accesibilidad táctil.** Cualquier control interactivo tendrá un área mínima de 44×44 px. Ninguna acción podrá depender de `hover`, que no existe en pantallas táctiles: reordenar, borrar y cualquier acción equivalente necesitan alternativa por toque y por teclado.
+- **Los directos son un producto aparte, con puerta propia.** El vídeo en directo exige servidor de medios (SFU con WebRTC, o ingesta RTMP y reparto HLS), CDN, transcodificación y un coste recurrente por espectador y minuto, además de moderación en tiempo real. Un directo sin moderar en una aplicación de citas es un riesgo de contenido ilegal con responsabilidad para quien lo opera. No se escribirá código hasta que exista un documento propio con proveedor, presupuesto, alcance (1-a-1 o difusión), política de grabación y retención, y responsable de moderación.
 
 ## 2. Estructura exacta del monorepo
 
@@ -238,6 +245,25 @@ La extensión y cada grupo funcional se desplegarán en la fase correspondiente;
 - `blocks`: `blocker_id`, `blocked_id`, `created_at`, PK `(blocker_id,blocked_id)`, check de usuarios distintos e índice inverso `blocks_blocked_idx(blocked_id,blocker_id)`. Bloquear excluye discovery y corta interacción/mensajería en ambas direcciones.
 - `reports`: `id`, `reporter_id`, `reported_id`, `reason`, `description`, `status`, `created_at`, `resolved_at`; checks de usuarios distintos y estados permitidos; índices `reports_status_idx(status,created_at)` y `reports_reporter_target_idx(reporter_id,reported_id,created_at DESC)`.
 
+### `subscriptions` y `payment_events` — Fase 10
+
+- `subscriptions`: `user_id uuid PK/FK users`, `provider text`, `external_customer_id text`, `external_subscription_id text`, `status text`, `current_period_end timestamptz`, `cancel_at_period_end bool`, `created_at`, `updated_at`.
+- Checks: `status IN ('trialing','active','past_due','canceled','incomplete')`. Índices: `subscriptions_external_uq UNIQUE(provider, external_subscription_id)` y `subscriptions_status_idx(status, current_period_end)`.
+- `payment_events`: `id uuid PK`, `provider text`, `external_event_id text`, `type text`, `received_at`, `processed_at NULL`, `payload jsonb`. Índice `payment_events_external_uq UNIQUE(provider, external_event_id)`: es lo que hace idempotente el procesado de webhooks reentregados.
+- **Ninguna de las dos tablas guarda datos de tarjeta.** Solo identificadores del proveedor. El acceso premium se resuelve siempre en la capa de aplicación consultando `subscriptions`, nunca a partir de un valor enviado por el cliente.
+
+### `posts`, `post_media` y `post_likes` — Fase 11
+
+- `posts`: `id uuid PK`, `author_id FK users`, `content varchar(2000) NULL`, `visibility text`, `created_at`, `updated_at`, `deleted_at NULL`. Checks: `visibility IN ('public','matches')` y contenido no vacío cuando no hay media.
+- `post_media`: `id uuid PK`, `post_id FK posts`, `storage_key text`, `mime_type text`, `byte_size bigint`, `width int`, `height int`, `position smallint`, `created_at`. Claves de objeto generadas por el backend; unicidad en `storage_key`.
+- `post_likes`: PK compuesta `(post_id, user_id)`, `created_at`. El contador se calcula o se cachea; no se mantiene un contador duplicado susceptible de desincronizarse.
+- Índices de lectura: `posts_author_cursor_idx(author_id, created_at DESC, id DESC) WHERE deleted_at IS NULL` y `posts_feed_idx(created_at DESC, id DESC) WHERE deleted_at IS NULL`. Paginación por cursor `(created_at, id)`, nunca `OFFSET`.
+- Los bloqueos de la Fase 3 se aplican al feed en ambas direcciones, igual que en discovery y mensajería. Los reportes reutilizan la tabla `reports`.
+
+### Tablas de directos — Fase 12
+
+Se definirán en el documento propio que exige la puerta de la Fase 12. No se añadirán al esquema antes de que ese documento esté aprobado.
+
 La aplicación usará un rol de base de datos con privilegios mínimos y sin DDL. Un proceso de migración separado usará otro rol. `DATABASE_URL` y `MIGRATIONS_DATABASE_URL` serán obligatorias y no tendrán fallback.
 
 ## 4. Contratos y criterios técnicos por fase
@@ -328,6 +354,39 @@ La aplicación usará un rol de base de datos con privilegios mínimos y sin DDL
 - Frontend: pantallas de solicitar/confirmar verificación y reset, estados genéricos contra enumeración y validación Zod de la nueva contraseña.
 - Tests: token usado, revocado, caducado o alterado; solicitudes sin enumeración; carrera de dos confirmaciones; verificación idempotente; y prueba end-to-end de que, tras reset, fallan inmediatamente todos los access y refresh tokens anteriores.
 
+### Fase 9 — Experiencia: responsive, fotos y animación
+
+- **Accesibilidad táctil.** Área mínima de 44×44 px en todo control interactivo. Se eliminan las acciones que hoy solo aparecen en `hover`: reordenar, marcar principal y borrar fotos necesitan alternativa por toque y por teclado. Medido en el estado actual: la navegación usa botones de 40×32 px y los controles de foto dependen de `hover`, así que en móvil son inalcanzables.
+- **Puntos de ruptura documentados** y verificados a 320, 375, 768 y 1280 px. El layout actual no desborda horizontalmente; el objetivo de esta fase es la ergonomía, no rescatar el layout. Ningún `hidden sm:*` se añade sin comprobar qué queda utilizable por debajo.
+- **Fotos.** Arrastrar y soltar además del clic, previsualización y recorte con relación de aspecto fija antes de subir, reordenar arrastrando con alternativa por teclado, progreso real por archivo con reintento, y compresión en cliente respetando el límite de 10 MiB y los tipos permitidos. La validación del servidor —detección de MIME decodificando el contenido real— no se relaja para admitir formatos nuevos.
+- **Animación y 3D.** Presupuesto medido y registrado antes de escribir código: 60 fps en móvil de gama media y límite explícito de bundle. Preferencia por transformaciones CSS; WebGL solo diferido y por vista si resulta imprescindible. Toda animación con su variante de movimiento reducido.
+- Tests: objetivos táctiles y navegación por teclado en los flujos de foto y navegación; render de las vistas principales en los cuatro anchos; y una prueba de que `prefers-reduced-motion` desactiva las animaciones nuevas.
+- Terminado: sin regresiones en las suites existentes, presupuesto de rendimiento cumplido y documentado, y prueba de humo real en móvil.
+
+### Fase 10 — Premium y pagos
+
+- **Gate obligatorio:** no se activan cobros reales hasta que las Fases 7 y 8 estén cerradas. Hasta entonces la integración vive en modo de pruebas del proveedor.
+- Checkout alojado del proveedor. Ningún dato de tarjeta llega a este backend, ni en tránsito ni en logs. Las claves de API se montan como secretos.
+- Endpoints: iniciar checkout autenticado, consultar estado de suscripción propia, portal de gestión del proveedor y receptor de webhooks. El receptor **verifica la firma** antes de mirar el cuerpo y es **idempotente por id de evento** mediante `payment_events`.
+- El acceso premium se resuelve en la capa de aplicación consultando `subscriptions`. Ninguna comprobación de entitlement ocurre en el cliente.
+- Tests: firma inválida rechazada, webhook reentregado procesado una sola vez, eventos fuera de orden, expiración y cancelación reflejadas, y prueba de que ningún endpoint acepta ni registra datos de tarjeta.
+- Terminado: flujo completo en modo de pruebas del proveedor, con evidencia de idempotencia y de verificación de firma.
+
+### Fase 11 — Publicaciones
+
+- Esquema `posts`, `post_media` y `post_likes` de la sección 3. Texto sanitizado con la política existente; media con clave generada por el backend y validada decodificando el contenido.
+- Endpoints: crear, listar feed por cursor, ver publicación, dar y quitar like, borrar la propia. Autorización explícita por visibilidad; los bloqueos se aplican en ambas direcciones igual que en discovery y mensajería.
+- Moderación desde el primer día: reportes reutilizando la tabla `reports` y límites de frecuencia en Redis, fail-closed.
+- Frontend con feed paginado sin saltos de scroll, composición con previsualización y estados accesibles de carga, vacío y error.
+- Tests: cursor sin duplicados ni saltos, bloqueo bidireccional aplicado al feed, borrado lógico invisible para terceros, límite de frecuencia, autorización de borrado e idempotencia del like.
+
+### Fase 12 — Directos
+
+- **Puerta obligatoria y documento propio.** No se escribe código ni se añaden tablas hasta que exista y se apruebe un documento que fije: proveedor y arquitectura de medios (SFU con WebRTC, o ingesta RTMP y reparto HLS), presupuesto con coste por espectador y minuto, alcance (1-a-1 o difusión), política de grabación y retención, y responsable de moderación en tiempo real.
+- **Moderación en tiempo real como requisito de entrada, no como mejora.** Un directo sin moderar en una aplicación de citas es un riesgo de contenido ilegal con responsabilidad para quien opera el servicio.
+- Cuando se apruebe, el proveedor vivirá detrás de un puerto de dominio, con la clave solo en el backend, límites por usuario en Redis, timeouts y política de privacidad y retención explícitas.
+- Primer paso técnico: prueba de concepto aislada con un proveedor gestionado, sin acoplarla al resto del sistema.
+
 ## 5. Estrategia de pruebas y commits
 
 - Unitarios junto al paquete (`*_test.go`, `*.test.tsx`) y dobles escritos contra puertos del dominio.
@@ -349,4 +408,14 @@ La aplicación usará un rol de base de datos con privilegios mínimos y sin DDL
 
 ## 7. Puerta de aprobación
 
-Tras aprobar este documento se iniciará únicamente la **Fase 0**. Al terminar se entregará un resumen breve, evidencia de pruebas y el listado de decisiones nuevas, y se esperará revisión antes de avanzar a Fase 1. La Fase 6 requerirá una segunda aprobación específica aunque las fases anteriores estén aceptadas; las Fases 7 y 8 son obligatorias para considerar terminado el alcance actual.
+Cada fase termina con un resumen breve, evidencia de pruebas y el listado de decisiones nuevas, y espera revisión antes de avanzar a la siguiente.
+
+Puertas vigentes:
+
+- **Fase 4**: no se inicia ninguna fase posterior mientras le falten la interfaz de chat, la ejecución de sus pruebas de integración y su documentación.
+- **Fase 6 (LLM)**: requiere una segunda aprobación específica aunque las anteriores estén aceptadas.
+- **Fases 7 y 8**: obligatorias para considerar terminado el alcance actual, y **previas a activar cobros reales** en la Fase 10.
+- **Fase 10 (pagos)**: hasta cerrar 7 y 8, la integración permanece en modo de pruebas del proveedor.
+- **Fase 12 (directos)**: requiere documento propio aprobado —proveedor, presupuesto, alcance, retención y responsable de moderación— antes de escribir código o añadir tablas.
+
+Orden recomendado del alcance ampliado: cerrar **4**, luego **9** (correcciones acotadas sobre lo ya construido), después **7** y **8** por su carácter legal, y solo entonces **10**, **11** y **12**.
