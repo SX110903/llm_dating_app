@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { App } from "@/app/App"
@@ -88,5 +89,65 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: /fotos/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /finalizar perfil/i })).toBeInTheDocument()
+  })
+
+  it("keeps every mobile header action named and at least 44px tall", async () => {
+    useAuthStore.getState().setSession({
+      accessToken: "token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00Z",
+      user: {
+        id: "1",
+        email: "person@example.com",
+        display_name: "Person",
+        birth_date: "1995-01-01",
+        gender: "woman",
+        status: "active",
+        email_verified_at: null,
+        created_at: "2026-01-01T00:00:00Z",
+      },
+    })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.endsWith("/profile")) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              user_id: "1",
+              bio: "Ready",
+              interests: ["music"],
+              city: "Madrid",
+              has_location: true,
+              questionnaire: {},
+              onboarding_completed: true,
+              created_at: "2026-01-01T00:00:00Z",
+              updated_at: "2026-01-01T00:00:00Z",
+            }),
+          )
+        }
+        if (url.includes("/discovery")) return Promise.resolve(jsonResponse(200, { candidates: [] }))
+        return Promise.resolve(jsonResponse(404, { code: "NOT_FOUND", message: "none", request_id: "r1" }))
+      }),
+    )
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <App />
+      </QueryClientProvider>,
+    )
+
+    const navigationLabels = ["Descubrir", "Matches", "Mensajes", "Perfil"]
+    for (const label of navigationLabels) {
+      const button = await screen.findByRole("button", { name: label })
+      expect(button).toHaveClass("min-h-11", "min-w-11")
+    }
+    expect(screen.getByRole("button", { name: "Ir a Descubrir" })).toHaveClass("min-h-11")
+    expect(screen.getByRole("button", { name: "Cerrar sesión" })).toHaveClass("h-11", "w-11")
+
+    const profileButton = screen.getByRole("button", { name: "Perfil" })
+    profileButton.focus()
+    await userEvent.setup().keyboard("{Enter}")
+    expect(profileButton).toHaveAttribute("aria-current", "page")
   })
 })

@@ -35,6 +35,19 @@ select {
   font: inherit;
 }
 
+button, [role="button"], input:not([type="hidden"]), select, textarea {
+  min-height: 44px;
+}
+
+button, [role="button"] {
+  min-width: 44px;
+}
+
+:focus-visible {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 2px;
+}
+
 .font-display {
   font-family: var(--font-display);
 }
@@ -55,4 +68,3 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
-

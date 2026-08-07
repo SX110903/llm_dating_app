@@ -62,6 +62,7 @@ function AuthenticatedApp() {
 type AppTab = "discovery" | "matches" | "messages" | "profile"
 
 function AppShell() {
+  const prefersReducedMotion = useReducedMotion()
   const [tab, setTab] = useState<AppTab>("discovery")
   const logout = useLogout()
   const user = useAuthStore((state) => state.user)
@@ -70,8 +71,13 @@ function AppShell() {
 
   return (
     <div className="w-full max-w-5xl">
-      <header className="mb-10 flex items-center justify-between gap-4">
-        <button type="button" onClick={() => setTab("discovery")} className="flex items-center gap-3 text-left">
+      <header className="mb-10 grid grid-cols-[1fr_auto] items-center gap-3 sm:flex sm:justify-between sm:gap-4">
+        <button
+          type="button"
+          onClick={() => setTab("discovery")}
+          aria-label="Ir a Descubrir"
+          className="flex min-h-11 items-center gap-3 text-left"
+        >
           <img src="/logo.svg" alt="" className="h-9 w-9" />
           <div>
             <p className="font-display text-lg font-semibold leading-none">LLMatch</p>
@@ -79,7 +85,10 @@ function AppShell() {
           </div>
         </button>
 
-        <nav aria-label="Navegacion principal" className="flex items-center rounded-full border border-white/10 bg-white/[0.035] p-1">
+        <nav
+          aria-label="Navegación principal"
+          className="order-3 col-span-2 flex w-full items-center justify-center rounded-full border border-white/10 bg-white/[0.035] p-1 sm:order-none sm:w-auto"
+        >
           <NavButton active={tab === "discovery"} label="Descubrir" onClick={() => setTab("discovery")}>
             <Heart aria-hidden className="h-4 w-4" />
           </NavButton>
@@ -98,14 +107,14 @@ function AppShell() {
           type="button"
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
-          aria-label="Cerrar sesion"
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/40 hover:bg-white/5 hover:text-white/70 disabled:opacity-40"
+          aria-label="Cerrar sesión"
+          className="flex h-11 w-11 items-center justify-center justify-self-end rounded-full border border-white/10 text-white/40 hover:bg-white/5 hover:text-white/70 disabled:opacity-40"
         >
           <LogOut aria-hidden className="h-4 w-4" />
         </button>
       </header>
 
-      <AnimateTab tab={tab}>
+      <AnimateTab tab={tab} reducedMotion={prefersReducedMotion ?? false}>
         {tab === "discovery" && <DiscoveryDeck onEditProfile={showProfile} onViewMatches={showMatches} />}
         {tab === "matches" && <MatchesList />}
         {tab === "messages" && <MessagesScreen />}
@@ -130,20 +139,26 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
+      aria-label={label}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition sm:px-4 ${
+      className={`flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition sm:px-4 ${
         active ? "bg-white text-zinc-950" : "text-white/45 hover:text-white/80"
       }`}
     >
       {children}
-      <span className="hidden sm:inline">{label}</span>
+      <span className="sr-only sm:not-sr-only">{label}</span>
     </button>
   )
 }
 
-function AnimateTab({ tab, children }: { tab: AppTab; children: React.ReactNode }) {
+function AnimateTab({ tab, children, reducedMotion }: { tab: AppTab; children: React.ReactNode; reducedMotion: boolean }) {
   return (
-    <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+    <motion.div
+      key={tab}
+      initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+      animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={reducedMotion ? undefined : { duration: 0.2 }}
+    >
       {children}
     </motion.div>
   )
