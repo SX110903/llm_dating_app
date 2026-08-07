@@ -25,15 +25,18 @@ import (
 	httpauth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/auth"
 	httphealth "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/health"
 	httpmatching "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/matching"
+	httpmessaging "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/messaging"
 	httpprofile "github.com/sx110903/llmatch-v2/backend/internal/adapters/http/profile"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/postgres/repositories"
 	redisadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/redis"
 	"github.com/sx110903/llmatch-v2/backend/internal/adapters/storage"
+	websocketadapter "github.com/sx110903/llmatch-v2/backend/internal/adapters/websocket"
 	applicationaccount "github.com/sx110903/llmatch-v2/backend/internal/application/account"
 	applicationauth "github.com/sx110903/llmatch-v2/backend/internal/application/auth"
 	applicationhealth "github.com/sx110903/llmatch-v2/backend/internal/application/health"
 	applicationmatching "github.com/sx110903/llmatch-v2/backend/internal/application/matching"
+	applicationmessaging "github.com/sx110903/llmatch-v2/backend/internal/application/messaging"
 	applicationprofile "github.com/sx110903/llmatch-v2/backend/internal/application/profile"
 	domainmatching "github.com/sx110903/llmatch-v2/backend/internal/domain/matching"
 	platformcrypto "github.com/sx110903/llmatch-v2/backend/internal/platform/crypto"
@@ -79,7 +82,8 @@ func testKeyPair(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
 // Postgres and Redis so integration tests exercise the actual adapters, not
 // doubles.
 func newTestServer(t *testing.T, pool *pgxpool.Pool, redisClient *redisclient.Client, production bool, allowedOrigins []string) *httptest.Server {
-	return newTestServerWithMatchingLimit(t, pool, redisClient, production, allowedOrigins, 100)
+	server, _ := newTestServerWithMessaging(t, pool, redisClient, production, allowedOrigins, 100)
+	return server
 }
 
 func newTestServerWithMatchingLimit(
@@ -90,6 +94,20 @@ func newTestServerWithMatchingLimit(
 	allowedOrigins []string,
 	dailySwipeLimit int,
 ) *httptest.Server {
+	server, _ := newTestServerWithMessaging(t, pool, redisClient, production, allowedOrigins, dailySwipeLimit)
+	return server
+}
+
+// newTestServerWithMessaging also returns the websocket handler so a test can
+// drive cross-instance fan-out without opening a real socket.
+func newTestServerWithMessaging(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	redisClient *redisclient.Client,
+	production bool,
+	allowedOrigins []string,
+	dailySwipeLimit int,
+) (*httptest.Server, *websocketadapter.Handler) {
 	t.Helper()
 	privateKey, publicKey := testKeyPair(t)
 	tokenIssuer := platformcrypto.NewTokenIssuer(privateKey, publicKey, "llmatch-v2-test", "llmatch-v2-test-clients", 15*time.Minute)
@@ -126,6 +144,22 @@ func newTestServerWithMatchingLimit(
 		},
 	)
 
+	messageBus := redisadapter.NewMessageBus(redisClient)
+	messagingService := applicationmessaging.NewService(
+		repositories.NewMessagingRepository(pool),
+		redisadapter.NewWSTicketStore(redisClient),
+		messageBus,
+		redisadapter.NewMessageRateLimiter(redisClient, time.Minute, 10_000),
+		applicationmessaging.Config{TicketTTL: 30 * time.Second},
+	)
+	websocketHandler := websocketadapter.NewHandler(
+		messagingService, websocketadapter.NewHub(), zerolog.Nop(), allowedOrigins,
+		websocketadapter.Config{
+			ReadLimitBytes: 32 * 1024, QueueSize: 64, WriteTimeout: 5 * time.Second,
+			PingInterval: 25 * time.Second, ReadTimeout: time.Minute, ClientEventsPerMinute: 120,
+		},
+	)
+
 	router := httpadapter.NewRouter(httpadapter.RouterConfig{
 		Logger:         zerolog.Nop(),
 		AllowedOrigins: allowedOrigins,
@@ -135,12 +169,14 @@ func newTestServerWithMatchingLimit(
 		Profile:        httpprofile.NewHandler(profileService),
 		Account:        httpaccount.NewHandler(privacyService),
 		Matching:       httpmatching.NewHandler(matchingService),
+		Messaging:      httpmessaging.NewHandler(messagingService),
+		WebSocket:      websocketHandler,
 		AuthMiddleware: authMiddleware,
 	})
 
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
-	return server
+	return server, websocketHandler
 }
 
 func registerUser(t *testing.T, server *httptest.Server, email, password string) {
