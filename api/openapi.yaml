@@ -1,8 +1,10 @@
 openapi: 3.1.0
 info:
   title: LLMatch API
-  version: 0.4.0
-  description: Contrato hasta la Fase 3. Expone salud, autenticación, perfil, discovery, swipes, matches y acciones de seguridad.
+  version: 0.5.0
+  description: >-
+    Contrato hasta la Fase 4. Expone salud, autenticación, perfil, discovery,
+    swipes, matches, acciones de seguridad y mensajería en tiempo real.
 servers:
   - url: /api/v1
 paths:
@@ -842,6 +844,280 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /conversations:
+    get:
+      operationId: listConversations
+      security:
+        - bearerAuth: []
+      description: Conversaciones activas del usuario, de la más reciente a la más antigua.
+      parameters:
+        - name: limit
+          in: query
+          description: Tamaño de página; 30 por defecto y 100 como máximo.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Resumen por match con último mensaje y mensajes sin leer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationListResponse"
+        "400":
+          description: Límite inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o mensajería no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /matches/{matchID}/messages:
+    get:
+      operationId: listMessages
+      security:
+        - bearerAuth: []
+      description: >-
+        Historial paginado por cursor sobre `(created_at, id)`, del más reciente
+        al más antiguo. Nunca usa OFFSET, así que insertar mensajes durante la
+        paginación no produce huecos ni duplicados.
+      parameters:
+        - name: matchID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cursor
+          in: query
+          description: Cursor opaco devuelto por la página anterior.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Tamaño de página; 30 por defecto y 100 como máximo.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Página de mensajes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+        "400":
+          description: UUID, cursor o límite inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: >-
+            Conversación inexistente, ajena, deshecha o bloqueada. Los cuatro
+            casos comparten respuesta para que sondear no permita distinguirlos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o mensajería no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: sendMessage
+      security:
+        - bearerAuth: []
+      description: >-
+        Envía un mensaje de texto. `client_nonce` lo hace idempotente: reenviar
+        el mismo nonce devuelve 200 con el mensaje ya almacenado en lugar de
+        crear otro. El remitente sale siempre de la identidad autenticada, nunca
+        del cuerpo, y la clave de objeto no es aceptable desde el cliente.
+      parameters:
+        - name: matchID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: Mensaje creado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "200":
+          description: Nonce ya usado; se devuelve el mensaje almacenado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          description: Cuerpo o UUID inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Conversación inexistente, ajena, deshecha o bloqueada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Contenido vacío, demasiado largo o tipo no admitido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Límite de mensajes superado; los segundos restantes van en `Retry-After`.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o mensajería no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /matches/{matchID}/messages/read:
+    post:
+      operationId: markMessagesRead
+      security:
+        - bearerAuth: []
+      description: >-
+        Marca como leídos los mensajes recibidos en la conversación. Es
+        idempotente: repetirlo actualiza cero filas. Nunca afecta a los mensajes
+        enviados por quien llama.
+      parameters:
+        - name: matchID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Número de mensajes marcados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkReadResponse"
+        "400":
+          description: UUID inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Conversación inexistente, ajena, deshecha o bloqueada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Dependencia de autenticación o mensajería no disponible.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /messaging/tickets:
+    post:
+      operationId: issueWebSocketTicket
+      security:
+        - bearerAuth: []
+      description: >-
+        Emite un ticket de un solo uso y vida corta para el handshake del
+        WebSocket. El navegador no puede enviar cabecera Authorization en un
+        handshake, así que el ticket viaja como segunda entrada de
+        `Sec-WebSocket-Protocol` y jamás en la URL.
+      responses:
+        "201":
+          description: Ticket emitido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketResponse"
+        "401":
+          description: Access token ausente, inválido o revocado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Redis no disponible; sin él no se emiten tickets.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /ws:
+    get:
+      operationId: openMessagingSocket
+      description: >-
+        Handshake del WebSocket. No usa bearer: se autentica consumiendo el
+        ticket de `POST /messaging/tickets`, enviado como
+        `Sec-WebSocket-Protocol: llmatch.v1, <ticket>`. El servidor solo
+        publica; los mensajes se envían por HTTP para mantener persistencia e
+        idempotencia en un único sitio.
+      parameters:
+        - name: Sec-WebSocket-Protocol
+          in: header
+          required: true
+          schema:
+            type: string
+          example: llmatch.v1, 8f14e45fceea167a5a36dedd4bea2543
+      responses:
+        "101":
+          description: Conexión establecida; los eventos siguen el esquema ServerEvent.
+        "401":
+          description: Ticket ausente, caducado o ya consumido.
+        "503":
+          description: Redis no disponible; el handshake nunca se acepta a ciegas.
 components:
   securitySchemes:
     bearerAuth:
@@ -1259,3 +1535,176 @@ components:
         created_at:
           type: string
           format: date-time
+    Message:
+      type: object
+      required: [id, match_id, sender_id, type, read_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        match_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        client_nonce:
+          type: string
+          format: uuid
+          description: Ausente en proyecciones que no lo llevan, como el último mensaje de una conversación.
+        type:
+          type: string
+          enum: [text, image, gif]
+        content:
+          type: string
+          maxLength: 2000
+        storage_key:
+          type: string
+          description: Generada siempre por el servidor. Nunca se acepta desde el cliente.
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    SendMessageRequest:
+      type: object
+      required: [client_nonce, type, content]
+      properties:
+        client_nonce:
+          type: string
+          format: uuid
+          description: Identificador del intento. Reutilizarlo en un reintento evita duplicar el mensaje.
+        type:
+          type: string
+          enum: [text]
+          description: Solo texto en esta fase; los tipos con media requieren subida propia del backend.
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    HistoryResponse:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        next_cursor:
+          type: string
+          description: Ausente cuando no quedan mensajes más antiguos.
+    Conversation:
+      type: object
+      required: [match_id, other_user_id, display_name, unread_count, matched_at]
+      properties:
+        match_id:
+          type: string
+          format: uuid
+        other_user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        primary_photo_id:
+          type: string
+          format: uuid
+        last_message:
+          $ref: "#/components/schemas/Message"
+        unread_count:
+          type: integer
+          minimum: 0
+        matched_at:
+          type: string
+          format: date-time
+    ConversationListResponse:
+      type: object
+      required: [conversations]
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+    MarkReadResponse:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+          minimum: 0
+    TicketResponse:
+      type: object
+      required: [ticket, expires_at, subprotocol]
+      properties:
+        ticket:
+          type: string
+          description: Opaco y de un solo uso. Solo se guarda su hash en Redis.
+        expires_at:
+          type: string
+          format: date-time
+        subprotocol:
+          type: string
+          const: llmatch.v1
+    ServerEvent:
+      type: object
+      description: Evento empujado por el WebSocket. No forma parte de ninguna respuesta HTTP.
+      required: [type, sent_at]
+      properties:
+        type:
+          type: string
+          enum: [ready, message, typing, conversation_closed]
+        message:
+          $ref: "#/components/schemas/MessagePayload"
+        match_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        sent_at:
+          type: string
+          format: date-time
+    MessagePayload:
+      type: object
+      description: >-
+        Mensaje tal y como viaja por el socket. No lleva `read_at`: el estado de
+        lectura pertenece a quien recibe y solo llega por HTTP.
+      required: [id, match_id, sender_id, type, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        match_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        client_nonce:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [text, image, gif]
+        content:
+          type: string
+          maxLength: 2000
+        storage_key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    ClientEvent:
+      type: object
+      description: >-
+        Único tipo de trama que el navegador puede enviar. Los mensajes no se
+        envían por aquí a propósito.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [typing, ping]
+        match_id:
+          type: string
+          format: uuid

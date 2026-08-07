@@ -90,4 +90,20 @@ Healthchecks:
 
 Variables opcionales con valores predeterminados seguros para esta fase: `MATCHING_DAILY_SWIPE_LIMIT=100`, `MATCHING_WEIGHT_INTERESTS=0.35`, `MATCHING_WEIGHT_QUESTIONNAIRE=0.30`, `MATCHING_WEIGHT_DISTANCE=0.20` y `MATCHING_WEIGHT_ACTIVITY=0.15`.
 
-Mensajería, historias, verificación de email y recuperación de contraseña todavía no están implementadas. La siguiente fase no se inicia sin confirmación.
+## Mensajería en tiempo real (Fase 4)
+
+- Endpoints autenticados `GET /conversations`, `GET/POST /matches/{matchID}/messages`, `POST /matches/{matchID}/messages/read` y `POST /messaging/tickets`, más el handshake `GET /ws`. Contrato completo en [api/openapi.yaml](api/openapi.yaml).
+- **Autorización por consulta, no por código.** Cada operación resuelve la pertenencia con una única sentencia que exige match activo, membresía del usuario y ausencia de bloqueo en ambas direcciones. Conversación inexistente, ajena, deshecha y bloqueada devuelven el mismo 404, de modo que sondear no permite distinguirlas.
+- **Envío idempotente.** El par `(sender_id, client_nonce)` tiene índice único y la inserción usa `ON CONFLICT DO NOTHING`: reenviar tras un timeout devuelve 200 con el mensaje ya almacenado en lugar de duplicarlo. La carrera de dos envíos simultáneos con el mismo nonce está cubierta por pruebas de integración.
+- **Sin claves de objeto del cliente.** El cuerpo de envío no admite `storage_key` y solo acepta `type: text`. Aceptar una clave propuesta por el cliente permitiría apuntar un mensaje a un objeto ajeno, así que los tipos con media esperan a que el backend genere la clave él mismo.
+- **Historial por cursor** sobre `(created_at, id)`, nunca `OFFSET`. Los cursores son opacos, versionados y se rechazan si vienen alterados.
+- **Handshake con ticket de un solo uso.** `POST /messaging/tickets` emite un ticket opaco de vida corta del que Redis solo guarda el hash; el consumo es atómico vía Lua, así que un ticket no sirve dos veces. Viaja como segunda entrada de `Sec-WebSocket-Protocol`, nunca en la URL, donde acabaría en logs, referrers e historial.
+- **Fail-closed.** Sin Redis no se emiten ni se consumen tickets: la respuesta es 503 y el handshake nunca se acepta a ciegas.
+- **Persistir antes de publicar.** El mensaje es duradero antes del fan-out por Pub/Sub, así que perder la publicación solo cuesta entrega en vivo; el cliente la recupera por HTTP desde su último cursor. La entrega entre instancias distintas está cubierta por pruebas de integración.
+- **Contrapresión por desconexión.** Cada cliente tiene una cola acotada; si se llena, se cierra esa conexión en lugar de bloquear el hub. Un consumidor lento nunca degrada al resto.
+- El socket solo acepta tramas `typing` y `ping`. Enviar mensajes va por HTTP a propósito, para mantener persistencia e idempotencia en un único sitio.
+- La interfaz añade la pestaña Mensajes: lista de conversaciones con no leídos, chat con historial paginado, envío optimista con reintento que conserva el nonce, indicador de escritura y reconexión con backoff y jitter que pide un ticket nuevo en cada intento.
+
+Variables opcionales con valores predeterminados seguros para esta fase: `MESSAGING_TICKET_TTL=30s`, `MESSAGING_RATE_LIMIT=60`, `MESSAGING_RATE_WINDOW=1m`, `MESSAGING_SOCKET_QUEUE_SIZE=64`, `MESSAGING_SOCKET_READ_LIMIT_BYTES=32768`, `MESSAGING_SOCKET_WRITE_TIMEOUT=10s`, `MESSAGING_SOCKET_PING_INTERVAL=25s`, `MESSAGING_SOCKET_READ_TIMEOUT=5m` y `MESSAGING_CLIENT_EVENTS_PER_MINUTE=120`. El arranque falla si el intervalo de ping no es menor que el timeout de lectura.
+
+Historias, LLM, verificación de email y recuperación de contraseña todavía no están implementadas. La siguiente fase no se inicia sin confirmación.
