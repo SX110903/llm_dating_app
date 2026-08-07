@@ -1,6 +1,6 @@
 # LLMatch v2 — plan de ejecución
 
-Estado: **aprobado el 5 de agosto de 2026**, ampliado el 6 de agosto de 2026 con las Fases 9 a 12. Las Fases 0 a 4 están implementadas y validadas. La implementación y la validación automatizada de la Fase 9 están terminadas; su cierre queda pendiente exclusivamente de la prueba de humo obligatoria en un teléfono físico.
+Estado: **aprobado el 5 de agosto de 2026**, ampliado el 6 de agosto de 2026 con las Fases 9 a 12. Las Fases 0 a 4 están implementadas y validadas. La Fase 9 se cerró el 7 de agosto de 2026 con la validación automatizada y el smoke local superados, pero con una excepción expresa: el responsable del proyecto ordenó omitir la prueba de humo en un teléfono físico.
 
 ## 1. Alcance y decisiones cerradas
 
@@ -356,13 +356,14 @@ La aplicación usará un rol de base de datos con privilegios mínimos y sin DDL
 
 ### Fase 9 — Experiencia: responsive, fotos y animación
 
-- **Estado: implementación terminada y validación automatizada superada el 7 de agosto de 2026; pendiente de cierre por prueba de humo en móvil físico.**
+- **Estado: cerrada el 7 de agosto de 2026 con una excepción documentada.** La implementación, las suites, el presupuesto y el smoke local están validados. La prueba en móvil físico no se ejecutó porque el responsable del proyecto ordenó omitirla; no se registra como superada.
 - **Accesibilidad táctil.** Área mínima de 44×44 px en todo control interactivo. Se eliminan las acciones que hoy solo aparecen en `hover`: reordenar, marcar principal y borrar fotos necesitan alternativa por toque y por teclado. Medido en el estado actual: la navegación usa botones de 40×32 px y los controles de foto dependen de `hover`, así que en móvil son inalcanzables.
 - **Puntos de ruptura documentados** y verificados a 320, 375, 768 y 1280 px. El layout actual no desborda horizontalmente; el objetivo de esta fase es la ergonomía, no rescatar el layout. Ningún `hidden sm:*` se añade sin comprobar qué queda utilizable por debajo.
 - **Fotos.** Arrastrar y soltar además del clic, previsualización y recorte con relación de aspecto fija antes de subir, reordenar arrastrando con alternativa por teclado, progreso real por archivo con reintento, y compresión en cliente respetando el límite de 10 MiB y los tipos permitidos. La validación del servidor —detección de MIME decodificando el contenido real— no se relaja para admitir formatos nuevos.
 - **Animación y 3D.** Presupuesto medido y registrado antes de escribir código: 60 fps en móvil de gama media y límite explícito de bundle. Preferencia por transformaciones CSS; WebGL solo diferido y por vista si resulta imprescindible. Toda animación con su variante de movimiento reducido.
 - Tests: objetivos táctiles y navegación por teclado en los flujos de foto y navegación; render de las vistas principales en los cuatro anchos; y una prueba de que `prefers-reduced-motion` desactiva las animaciones nuevas.
 - Terminado: sin regresiones en las suites existentes, presupuesto de rendimiento cumplido y documentado, y prueba de humo real en móvil.
+- Excepción de cierre del 7 de agosto de 2026: el responsable del proyecto retiró el requisito de ejecutar el smoke en móvil físico para este cierre. La ausencia de esa evidencia queda aceptada de forma explícita y no altera el requisito original para futuras fases.
 
 ### Fase 10 — Premium y pagos
 

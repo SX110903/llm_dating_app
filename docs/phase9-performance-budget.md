@@ -41,7 +41,7 @@ El medidor no aplica latencia de red artificial. Los tiempos de carga sirven par
 - No se incorpora motor WebGL. La profundidad visual se resolverá con `transform`, `perspective` y composición acelerada por CSS.
 - Toda animación nueva tendrá una variante sin movimiento cuando `prefers-reduced-motion` esté activo.
 
-La prueba final repetirá exactamente el mismo build y comando. La fase no se cerrará sin una prueba de humo adicional en un teléfono físico; la emulación no la sustituye.
+La prueba final repetirá exactamente el mismo build y comando. El criterio original exigía además una prueba de humo en un teléfono físico, porque la emulación no la sustituye. El 7 de agosto de 2026 el responsable del proyecto ordenó omitirla para cerrar esta fase; por tanto, no existe evidencia de dispositivo real y el cierre conserva esa excepción de forma explícita.
 
 ## Resultado tras la implementación
 

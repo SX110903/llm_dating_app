@@ -1,6 +1,6 @@
 # LLMatch v2
 
-Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); las **Fases 0 a 4** están implementadas y validadas. La implementación de la Fase 9 está terminada y su cierre espera únicamente la prueba de humo obligatoria en un teléfono físico.
+Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); las **Fases 0 a 4** están implementadas y validadas. La Fase 9 está cerrada con una excepción documentada: por instrucción expresa del responsable del proyecto se omitió la prueba de humo en un teléfono físico.
 
 ## Requisitos
 
@@ -114,6 +114,6 @@ Variables opcionales con valores predeterminados seguros para esta fase: `MESSAG
 - La subida acepta clic o arrastre, abre un recorte cuadrado antes de transferir, comprime en el navegador manteniendo JPEG, PNG o WebP, muestra el progreso real de XHR y conserva el archivo preparado para reintentar un fallo. La validación de contenido del servidor permanece sin cambios y sigue siendo la autoridad.
 - La carta de discovery añade profundidad e inclinación 3D durante el gesto mediante perspectiva y transformaciones existentes. No se añadió WebGL ni una dependencia de renderizado; con `prefers-reduced-motion`, las animaciones y transformaciones nuevas se desactivan.
 - El presupuesto completo y el método reproducible están en [docs/phase9-performance-budget.md](docs/phase9-performance-budget.md). El build final queda en 545,97 kB de JavaScript inicial, 41,80 kB de CSS inicial y 1,77 kB gzip para el chunk diferido de preparación de fotos; la medición móvil obtiene 59,51 fps, p95 de 16,80 ms y FCP de 1.396 ms, dentro de todos los límites fijados antes del 3D.
-- La suite frontend termina con 54 tests, incluyendo navegación por teclado, objetivos táctiles, arrastre y reordenación de fotos, reintento y movimiento reducido. El smoke local recorrió las cuatro vistas y completó una subida, recorte y borrado real de una foto de prueba. El único criterio aún pendiente es repetir el smoke en un teléfono físico; una emulación de viewport no lo sustituye.
+- La suite frontend termina con 54 tests, incluyendo navegación por teclado, objetivos táctiles, arrastre y reordenación de fotos, reintento y movimiento reducido. El smoke local recorrió las cuatro vistas y completó una subida, recorte y borrado real de una foto de prueba. La prueba en teléfono físico se omitió por instrucción expresa del responsable el 7 de agosto de 2026; no existe evidencia de ejecución en un dispositivo real y el cierre se registra como excepción al criterio original, no como prueba superada.
 
 Historias, LLM, RGPD, verificación de email y recuperación de contraseña todavía no están implementadas. No se inicia otra fase sin su aprobación correspondiente.
