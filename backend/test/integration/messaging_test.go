@@ -245,9 +245,12 @@ func TestBlockStopsMessagesInBothDirections(t *testing.T) {
 	chat := newChatFixture(t, server)
 
 	block := authedJSONRequest(t, server, http.MethodPost, "/api/v1/blocks", chat.aliceTk, map[string]any{
-		"target_id": chat.bobID,
+		"user_id": chat.bobID,
 	})
 	_ = block.Body.Close()
+	// Asserted so a rejected block cannot make the rest of the test pass for
+	// the wrong reason.
+	require.Equal(t, http.StatusNoContent, block.StatusCode)
 
 	fromBlocker := sendMessage(t, server, chat.aliceTk, chat.matchID, uuid.NewString(), "desde quien bloquea")
 	defer func() { _ = fromBlocker.Body.Close() }()
