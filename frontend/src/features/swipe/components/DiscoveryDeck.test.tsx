@@ -67,6 +67,9 @@ describe("DiscoveryDeck", () => {
     )
 
     expect(await screen.findByRole("heading", { name: /alex, 31/i })).toBeInTheDocument()
+    const card = screen.getByRole("article", { name: /perfil de alex/i })
+    expect(card).toHaveAttribute("data-motion-mode", "reduced")
+    expect(card.style.transformStyle).toBe("")
     await userEvent.setup().click(screen.getByRole("button", { name: /me gusta/i }))
 
     expect(await screen.findByRole("dialog", { name: /hay match/i })).toBeInTheDocument()

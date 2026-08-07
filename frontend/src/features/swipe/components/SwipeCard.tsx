@@ -25,6 +25,7 @@ export function SwipeCard({ candidate, disabled, onAction }: SwipeCardProps) {
       await controls.start({
         x: direction * 560,
         rotate: direction * 13,
+        rotateY: direction * -9,
         opacity: 0,
         transition: { type: "spring", stiffness: 230, damping: 24 },
       })
@@ -32,8 +33,16 @@ export function SwipeCard({ candidate, disabled, onAction }: SwipeCardProps) {
     try {
       await onAction(action)
     } catch {
-      controls.set({ x: 0, rotate: 0, opacity: 1 })
+      controls.set({ x: 0, rotate: 0, rotateX: 0, rotateY: 0, opacity: 1 })
     }
+  }
+
+  const handleDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (reducedMotion) return
+    controls.set({
+      rotateY: Math.max(-8, Math.min(8, info.offset.x / -18)),
+      rotateX: Math.max(-3, Math.min(3, info.offset.y / 20)),
+    })
   }
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -41,6 +50,8 @@ export function SwipeCard({ candidate, disabled, onAction }: SwipeCardProps) {
       void commit("like")
     } else if (info.offset.x < -DRAG_THRESHOLD) {
       void commit("dislike")
+    } else if (!reducedMotion) {
+      void controls.start({ rotateX: 0, rotateY: 0, transition: { duration: 0.18 } })
     }
   }
 
@@ -51,13 +62,19 @@ export function SwipeCard({ candidate, disabled, onAction }: SwipeCardProps) {
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.72}
       dragSnapToOrigin
+      onDrag={handleDrag}
       onDragEnd={handleDragEnd}
       animate={controls}
       initial={reducedMotion ? false : { opacity: 0, scale: 0.97, y: 12 }}
-      whileTap={disabled ? undefined : { cursor: "grabbing", scale: 1.01 }}
+      whileTap={disabled || reducedMotion ? undefined : { cursor: "grabbing", scale: 1.01 }}
+      style={reducedMotion ? undefined : { transformPerspective: 1000, transformStyle: "preserve-3d" }}
+      data-motion-mode={reducedMotion ? "reduced" : "full"}
       className="relative w-full touch-pan-y select-none overflow-hidden rounded-[2rem] border border-white/10 bg-[#191520] shadow-2xl shadow-black/40"
     >
-      <div className="relative aspect-[4/5] overflow-hidden bg-white/5">
+      <motion.div
+        className="relative aspect-[4/5] overflow-hidden bg-white/5"
+        style={reducedMotion ? undefined : { z: 12 }}
+      >
         {imageURL ? (
           <img src={imageURL} alt={`Foto de ${candidate.display_name}`} draggable={false} className="h-full w-full object-cover" />
         ) : (
@@ -80,9 +97,9 @@ export function SwipeCard({ candidate, disabled, onAction }: SwipeCardProps) {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="space-y-5 p-6 pt-5">
+      <motion.div className="space-y-5 p-6 pt-5" style={reducedMotion ? undefined : { z: 6 }}>
         {candidate.bio && <p className="text-sm leading-6 text-white/72">{candidate.bio}</p>}
         {candidate.interests.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -105,7 +122,7 @@ export function SwipeCard({ candidate, disabled, onAction }: SwipeCardProps) {
             <Heart aria-hidden className="h-6 w-6" />
           </ActionButton>
         </div>
-      </div>
+      </motion.div>
     </motion.article>
   )
 }
