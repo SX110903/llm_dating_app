@@ -1,6 +1,6 @@
 # LLMatch v2
 
-Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); actualmente están implementadas y validadas las **Fases 0 a 3**. El trabajo está detenido antes de la Fase 4.
+Reescritura segura de LLMatch como monorepo Go + React. La implementación avanza por las fases aprobadas en [PLAN.md](PLAN.md); las **Fases 0 a 4** están implementadas y validadas. La implementación de la Fase 9 está terminada y su cierre espera únicamente la prueba de humo obligatoria en un teléfono físico.
 
 ## Requisitos
 
@@ -106,4 +106,14 @@ Variables opcionales con valores predeterminados seguros para esta fase: `MATCHI
 
 Variables opcionales con valores predeterminados seguros para esta fase: `MESSAGING_TICKET_TTL=30s`, `MESSAGING_RATE_LIMIT=60`, `MESSAGING_RATE_WINDOW=1m`, `MESSAGING_SOCKET_QUEUE_SIZE=64`, `MESSAGING_SOCKET_READ_LIMIT_BYTES=32768`, `MESSAGING_SOCKET_WRITE_TIMEOUT=10s`, `MESSAGING_SOCKET_PING_INTERVAL=25s`, `MESSAGING_SOCKET_READ_TIMEOUT=5m` y `MESSAGING_CLIENT_EVENTS_PER_MINUTE=120`. El arranque falla si el intervalo de ping no es menor que el timeout de lectura.
 
-Historias, LLM, verificación de email y recuperación de contraseña todavía no están implementadas. La siguiente fase no se inicia sin confirmación.
+## Experiencia responsive, fotos y animación (Fase 9)
+
+- Todos los controles interactivos tienen un área mínima de 44×44 px y un foco visible. La navegación mantiene nombres accesibles cuando las etiquetas se ocultan visualmente, y se puede recorrer y activar con teclado.
+- Las vistas Descubrir, Matches, Mensajes y Perfil se verificaron a 320, 375, 768 y 1280 px. En los cuatro anchos se renderizaron sin desbordamiento horizontal ni controles visibles menores de 44×44 px; por debajo de 640 px, la navegación ocupa una segunda fila para conservar una cabecera utilizable.
+- Las acciones de foto ya no dependen de `hover`: un botón permanente abre un menú táctil y de teclado para marcar principal, mover o eliminar. Las tarjetas también se reordenan por arrastre y conservan los botones de mover como alternativa accesible.
+- La subida acepta clic o arrastre, abre un recorte cuadrado antes de transferir, comprime en el navegador manteniendo JPEG, PNG o WebP, muestra el progreso real de XHR y conserva el archivo preparado para reintentar un fallo. La validación de contenido del servidor permanece sin cambios y sigue siendo la autoridad.
+- La carta de discovery añade profundidad e inclinación 3D durante el gesto mediante perspectiva y transformaciones existentes. No se añadió WebGL ni una dependencia de renderizado; con `prefers-reduced-motion`, las animaciones y transformaciones nuevas se desactivan.
+- El presupuesto completo y el método reproducible están en [docs/phase9-performance-budget.md](docs/phase9-performance-budget.md). El build final queda en 545,97 kB de JavaScript inicial, 41,80 kB de CSS inicial y 1,77 kB gzip para el chunk diferido de preparación de fotos; la medición móvil obtiene 59,51 fps, p95 de 16,80 ms y FCP de 1.396 ms, dentro de todos los límites fijados antes del 3D.
+- La suite frontend termina con 54 tests, incluyendo navegación por teclado, objetivos táctiles, arrastre y reordenación de fotos, reintento y movimiento reducido. El smoke local recorrió las cuatro vistas y completó una subida, recorte y borrado real de una foto de prueba. El único criterio aún pendiente es repetir el smoke en un teléfono físico; una emulación de viewport no lo sustituye.
+
+Historias, LLM, RGPD, verificación de email y recuperación de contraseña todavía no están implementadas. No se inicia otra fase sin su aprobación correspondiente.

@@ -42,3 +42,22 @@ El medidor no aplica latencia de red artificial. Los tiempos de carga sirven par
 - Toda animación nueva tendrá una variante sin movimiento cuando `prefers-reduced-motion` esté activo.
 
 La prueba final repetirá exactamente el mismo build y comando. La fase no se cerrará sin una prueba de humo adicional en un teléfono físico; la emulación no la sustituye.
+
+## Resultado tras la implementación
+
+La medición final repitió el mismo build, viewport, densidad, ralentización de CPU y comando que la línea de partida.
+
+| Métrica | Resultado final | Límite | Estado |
+|---|---:|---:|---:|
+| JavaScript inicial minificado | 545,97 kB | 550 kB | Cumple |
+| JavaScript inicial gzip | 168,09 kB | 170 kB | Cumple |
+| CSS inicial minificado | 41,80 kB | 42 kB | Cumple |
+| CSS inicial gzip | 7,71 kB | 8 kB | Cumple |
+| Chunk diferido de preparación de fotos (JS gzip) | 1,77 kB | 25 kB | Cumple |
+| Transferencia inicial observada | 590.851 bytes | 610.000 bytes | Cumple |
+| First Contentful Paint | 1.396 ms | 1.500 ms | Cumple |
+| FPS medio | 59,51 | 58 mínimo | Cumple |
+| p95 por frame | 16,80 ms | 20 ms | Cumple |
+| Frame máximo | 33,37 ms | 50 ms | Cumple |
+
+El editor de fotos también genera un chunk CSS diferido de 1,75 kB minificados (0,70 kB gzip), que no se descarga hasta abrir el recorte. La solución 3D no incorpora WebGL ni dependencias nuevas: la profundidad y la inclinación usan perspectiva y transformaciones de Framer Motion/CSS ya presentes. Con movimiento reducido, estas transformaciones no se aplican.

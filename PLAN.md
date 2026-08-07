@@ -1,6 +1,6 @@
 # LLMatch v2 — plan de ejecución
 
-Estado: **aprobado el 5 de agosto de 2026**, ampliado el 6 de agosto de 2026 con las Fases 9 a 12. Las Fases 0 a 3 están implementadas y validadas. La Fase 4 tiene el backend terminado y probado; le falta la interfaz de chat, ejecutar sus pruebas de integración y su documentación. No se inicia ninguna fase posterior sin cerrar la 4.
+Estado: **aprobado el 5 de agosto de 2026**, ampliado el 6 de agosto de 2026 con las Fases 9 a 12. Las Fases 0 a 4 están implementadas y validadas. La implementación y la validación automatizada de la Fase 9 están terminadas; su cierre queda pendiente exclusivamente de la prueba de humo obligatoria en un teléfono físico.
 
 ## 1. Alcance y decisiones cerradas
 
@@ -356,6 +356,7 @@ La aplicación usará un rol de base de datos con privilegios mínimos y sin DDL
 
 ### Fase 9 — Experiencia: responsive, fotos y animación
 
+- **Estado: implementación terminada y validación automatizada superada el 7 de agosto de 2026; pendiente de cierre por prueba de humo en móvil físico.**
 - **Accesibilidad táctil.** Área mínima de 44×44 px en todo control interactivo. Se eliminan las acciones que hoy solo aparecen en `hover`: reordenar, marcar principal y borrar fotos necesitan alternativa por toque y por teclado. Medido en el estado actual: la navegación usa botones de 40×32 px y los controles de foto dependen de `hover`, así que en móvil son inalcanzables.
 - **Puntos de ruptura documentados** y verificados a 320, 375, 768 y 1280 px. El layout actual no desborda horizontalmente; el objetivo de esta fase es la ergonomía, no rescatar el layout. Ningún `hidden sm:*` se añade sin comprobar qué queda utilizable por debajo.
 - **Fotos.** Arrastrar y soltar además del clic, previsualización y recorte con relación de aspecto fija antes de subir, reordenar arrastrando con alternativa por teclado, progreso real por archivo con reintento, y compresión en cliente respetando el límite de 10 MiB y los tipos permitidos. La validación del servidor —detección de MIME decodificando el contenido real— no se relaja para admitir formatos nuevos.
